@@ -34,22 +34,26 @@ const Hero = () => {
                 </div>
                 
                 {/* Purchase Summary Cards */}
-                <div className="grid grid-cols-4 gap-6 mb-8">
+                <div className="grid grid-cols-5 gap-6 mb-8">
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <p className="text-sm text-gray-600">Total Purchases</p>
-                    <p className="text-2xl font-bold">$124,500</p>
+                    <p className="text-2xl font-bold">$198,750</p>
                   </div>
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <p className="text-sm text-gray-600">Active Orders</p>
-                    <p className="text-2xl font-bold">28</p>
+                    <p className="text-2xl font-bold">42</p>
                   </div>
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <p className="text-sm text-gray-600">Total Volume (m³)</p>
-                    <p className="text-2xl font-bold">65.2</p>
+                    <p className="text-2xl font-bold">52.4</p>
                   </div>
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <p className="text-sm text-gray-600">Available Space (m³)</p>
-                    <p className="text-2xl font-bold text-green-600">14.8</p>
+                    <p className="text-2xl font-bold text-green-600">7.6</p>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-600">Account Balance</p>
+                    <p className="text-2xl font-bold text-blue-600">$45,250</p>
                   </div>
                 </div>
 
@@ -58,11 +62,11 @@ const Hero = () => {
                   <h3 className="text-lg font-medium mb-4">Container Space Utilization</h3>
                   <div className="bg-gray-100 rounded-lg p-4">
                     <div className="flex justify-between mb-2">
-                      <span className="text-sm text-gray-600">Used: 65.2m³ (81.5%)</span>
-                      <span className="text-sm text-gray-600">Available: 14.8m³ (18.5%)</span>
+                      <span className="text-sm text-gray-600">Used: 52.4m³ (87.3%)</span>
+                      <span className="text-sm text-gray-600">Available: 7.6m³ (12.7%)</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2.5">
-                      <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: "81.5%" }}></div>
+                      <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: "87.3%" }}></div>
                     </div>
                   </div>
                 </div>
@@ -85,7 +89,7 @@ const Hero = () => {
                         <td className="px-6 py-4 whitespace-nowrap">Supplier Co.</td>
                         <td className="px-6 py-4 whitespace-nowrap">#ORD-2024-001</td>
                         <td className="px-6 py-4 whitespace-nowrap">$45,000</td>
-                        <td className="px-6 py-4 whitespace-nowrap">28.5</td>
+                        <td className="px-6 py-4 whitespace-nowrap">15.2</td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Delivered</span>
                         </td>
@@ -95,11 +99,31 @@ const Hero = () => {
                         <td className="px-6 py-4 whitespace-nowrap">Global Vendors Ltd.</td>
                         <td className="px-6 py-4 whitespace-nowrap">#ORD-2024-002</td>
                         <td className="px-6 py-4 whitespace-nowrap">$28,750</td>
-                        <td className="px-6 py-4 whitespace-nowrap">36.7</td>
+                        <td className="px-6 py-4 whitespace-nowrap">18.5</td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">In Transit</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-blue-600">View (2)</td>
+                      </tr>
+                      <tr>
+                        <td className="px-6 py-4 whitespace-nowrap">Asia Trade Partners</td>
+                        <td className="px-6 py-4 whitespace-nowrap">#ORD-2024-003</td>
+                        <td className="px-6 py-4 whitespace-nowrap">$65,000</td>
+                        <td className="px-6 py-4 whitespace-nowrap">12.4</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">Processing</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-blue-600">View (4)</td>
+                      </tr>
+                      <tr>
+                        <td className="px-6 py-4 whitespace-nowrap">Eastern Exports Co.</td>
+                        <td className="px-6 py-4 whitespace-nowrap">#ORD-2024-004</td>
+                        <td className="px-6 py-4 whitespace-nowrap">$60,000</td>
+                        <td className="px-6 py-4 whitespace-nowrap">6.3</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-800">Pending</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-blue-600">View (1)</td>
                       </tr>
                     </tbody>
                   </table>
