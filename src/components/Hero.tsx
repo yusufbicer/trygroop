@@ -12,14 +12,22 @@ const Hero = () => {
             Consolidate and track all your vendor purchases in one place. Manage documents, track deliveries, and optimize your container space utilization effortlessly.
           </p>
           <div className="mt-10 flex items-center justify-center gap-x-6">
-            <Button size="lg">
+            <Button 
+              size="lg"
+              className="bg-primary text-surface hover:bg-primary/90 transition-colors"
+            >
               Get started
             </Button>
-            <Button variant="link" size="lg">
+            <Button 
+              variant="ghost" 
+              size="lg"
+              className="text-secondary hover:text-primary hover:bg-accent/10"
+            >
               Learn more <span aria-hidden="true">→</span>
             </Button>
           </div>
         </div>
+
         <div className="mt-16 flow-root sm:mt-24">
           <div className="relative rounded-xl bg-gray-900/5 p-2 ring-1 ring-inset ring-gray-900/10 lg:-m-4 lg:rounded-2xl lg:p-4">
             <div className="rounded-lg bg-white shadow-2xl ring-1 ring-gray-900/10">
