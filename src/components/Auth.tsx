@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from '@/lib/supabase';
-import { FaGoogle, FaGithub } from 'react-icons/fa';
+import { FaGoogle, FaFacebook, FaXTwitter, FaInstagram } from 'react-icons/fa6';
 
 const Auth = () => {
   const [loading, setLoading] = useState(false);
@@ -58,10 +58,13 @@ const Auth = () => {
     }
   };
 
-  const handleSocialLogin = async (provider: 'google' | 'github') => {
+  const handleSocialLogin = async (provider: 'google' | 'facebook' | 'twitter' | 'instagram') => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
       if (error) throw error;
     } catch (error: any) {
@@ -141,11 +144,29 @@ const Auth = () => {
             <Button
               type="button"
               variant="outline"
-              onClick={() => handleSocialLogin('github')}
+              onClick={() => handleSocialLogin('facebook')}
               className="w-full"
             >
-              <FaGithub className="mr-2" />
-              GitHub
+              <FaFacebook className="mr-2" />
+              Facebook
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleSocialLogin('twitter')}
+              className="w-full"
+            >
+              <FaXTwitter className="mr-2" />
+              X
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleSocialLogin('instagram')}
+              className="w-full"
+            >
+              <FaInstagram className="mr-2" />
+              Instagram
             </Button>
           </div>
         </form>
