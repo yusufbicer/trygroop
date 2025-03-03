@@ -55,8 +55,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (userId: string) => {
     try {
-      const query = supabase.from('profiles') as any;
-      const { data, error } = await query
+      // Use type assertion to bypass TypeScript checks completely
+      const { data, error } = await (supabase.from('profiles') as any)
         .select('*')
         .eq('id', userId)
         .single();
@@ -130,8 +130,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       if (!user) throw new Error('No user logged in');
 
-      const query = supabase.from('profiles') as any;
-      const { error } = await query
+      // Use type assertion to bypass TypeScript checks completely
+      const { error } = await (supabase.from('profiles') as any)
         .update(updates)
         .eq('id', user.id);
 
