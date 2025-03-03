@@ -8,7 +8,7 @@ const steps = [
     number: '01',
     title: 'Register Your Account',
     description: 'Create your Groop account in minutes. Provide your business information and verify your identity.',
-    details: 'Our streamlined registration process is designed to get you up and running quickly. We only collect essential information and verify your identity to ensure the security of our platform. After registration, you'll have immediate access to your dashboard.',
+    details: 'Our streamlined registration process is designed to get you up and running quickly. We only collect essential information and verify your identity to ensure the security of our platform. After registration, you\'ll have immediate access to your dashboard.',
   },
   {
     number: '02',
