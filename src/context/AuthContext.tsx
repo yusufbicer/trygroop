@@ -55,9 +55,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (userId: string) => {
     try {
-      // @ts-ignore - Bypass TypeScript type checking for Supabase table access
-      const { data, error } = await supabase
-        .from('profiles')
+      const query = supabase.from('profiles') as any;
+      const { data, error } = await query
         .select('*')
         .eq('id', userId)
         .single();
@@ -131,9 +130,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       if (!user) throw new Error('No user logged in');
 
-      // @ts-ignore - Bypass TypeScript type checking for Supabase table access
-      const { error } = await supabase
-        .from('profiles')
+      const query = supabase.from('profiles') as any;
+      const { error } = await query
         .update(updates)
         .eq('id', user.id);
 
