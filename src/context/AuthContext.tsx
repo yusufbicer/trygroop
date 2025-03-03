@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,7 +27,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -38,7 +36,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     });
 
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -57,9 +54,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (userId: string) => {
     try {
-      // Using type assertion to bypass TypeScript's type checking
-      const { data, error } = await (supabase
-        .from('profiles') as any)
+      const query = supabase.from('profiles') as any;
+      const { data, error } = await query
         .select('*')
         .eq('id', userId)
         .single();
@@ -133,9 +129,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       if (!user) throw new Error('No user logged in');
 
-      // Using type assertion to bypass TypeScript's type checking
-      const { error } = await (supabase
-        .from('profiles') as any)
+      const query = supabase.from('profiles') as any;
+      const { error } = await query
         .update(updates)
         .eq('id', user.id);
 
@@ -196,4 +191,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
