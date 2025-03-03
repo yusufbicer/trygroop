@@ -27,17 +27,21 @@ export function useSupabaseMutation<T>({
 
       switch (operation) {
         case 'insert':
+          // @ts-ignore - Ignoring type check for now until the database types are generated
           query = supabase.from(table).insert(data);
           break;
         case 'update':
           if (!data.id) throw new Error('ID is required for update operations');
+          // @ts-ignore - Ignoring type check for now until the database types are generated
           query = supabase.from(table).update(data).eq('id', data.id);
           break;
         case 'delete':
           if (!data.id) throw new Error('ID is required for delete operations');
+          // @ts-ignore - Ignoring type check for now until the database types are generated
           query = supabase.from(table).delete().eq('id', data.id);
           break;
         case 'upsert':
+          // @ts-ignore - Ignoring type check for now until the database types are generated
           query = supabase.from(table).upsert(data);
           break;
         default:

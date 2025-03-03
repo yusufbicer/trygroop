@@ -57,6 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (userId: string) => {
     try {
+      // @ts-ignore - Ignoring type check for now until the database types are generated
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -132,6 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       if (!user) throw new Error('No user logged in');
 
+      // @ts-ignore - Ignoring type check for now until the database types are generated
       const { error } = await supabase
         .from('profiles')
         .update(updates)
