@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -54,8 +55,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (userId: string) => {
     try {
-      const query = supabase.from('profiles') as any;
-      const { data, error } = await query
+      // @ts-ignore - Bypass TypeScript type checking for Supabase table access
+      const { data, error } = await supabase
+        .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
@@ -129,8 +131,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       if (!user) throw new Error('No user logged in');
 
-      const query = supabase.from('profiles') as any;
-      const { error } = await query
+      // @ts-ignore - Bypass TypeScript type checking for Supabase table access
+      const { error } = await supabase
+        .from('profiles')
         .update(updates)
         .eq('id', user.id);
 
