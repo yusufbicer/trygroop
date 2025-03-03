@@ -1,12 +1,14 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, User } from 'lucide-react';
 import { CustomButton } from '../ui/CustomButton';
+import { useAuth } from '@/context/AuthContext';
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { user, signOut } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -43,25 +45,40 @@ const Navbar = () => {
               <Link to="/" className="text-white/80 hover:text-white transition-colors">
                 Home
               </Link>
-              <Link to="#features" className="text-white/80 hover:text-white transition-colors">
+              <Link to="/#features" className="text-white/80 hover:text-white transition-colors">
                 Features
               </Link>
-              <Link to="#how-it-works" className="text-white/80 hover:text-white transition-colors">
+              <Link to="/#how-it-works" className="text-white/80 hover:text-white transition-colors">
                 How It Works
               </Link>
-              <Link to="#blog" className="text-white/80 hover:text-white transition-colors">
+              <Link to="/#blog" className="text-white/80 hover:text-white transition-colors">
                 Blog
               </Link>
-              <Link to="/dashboard">
-                <CustomButton variant="secondary" size="sm">
-                  Sign In
-                </CustomButton>
-              </Link>
-              <Link to="/dashboard">
-                <CustomButton variant="primary" size="sm" isGlowing>
-                  Get Started
-                </CustomButton>
-              </Link>
+              {user ? (
+                <>
+                  <Link to="/dashboard">
+                    <CustomButton variant="secondary" size="sm">
+                      Dashboard
+                    </CustomButton>
+                  </Link>
+                  <CustomButton variant="outline" size="sm" onClick={() => signOut()}>
+                    Sign Out
+                  </CustomButton>
+                </>
+              ) : (
+                <>
+                  <Link to="/auth">
+                    <CustomButton variant="secondary" size="sm">
+                      Sign In
+                    </CustomButton>
+                  </Link>
+                  <Link to="/auth?tab=signup">
+                    <CustomButton variant="primary" size="sm" isGlowing>
+                      Get Started
+                    </CustomButton>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
 
@@ -93,45 +110,71 @@ const Navbar = () => {
               Home
             </Link>
             <Link
-              to="#features"
+              to="/#features"
               className="block py-2 text-white hover:text-groop-blue"
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Features
             </Link>
             <Link
-              to="#how-it-works"
+              to="/#how-it-works"
               className="block py-2 text-white hover:text-groop-blue"
               onClick={() => setIsMobileMenuOpen(false)}
             >
               How It Works
             </Link>
             <Link
-              to="#blog"
+              to="/#blog"
               className="block py-2 text-white hover:text-groop-blue"
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Blog
             </Link>
             <div className="flex flex-col gap-3 pt-2">
-              <Link to="/dashboard">
-                <CustomButton
-                  variant="secondary"
-                  className="w-full"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  Sign In
-                </CustomButton>
-              </Link>
-              <Link to="/dashboard">
-                <CustomButton
-                  variant="primary"
-                  className="w-full"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  Get Started
-                </CustomButton>
-              </Link>
+              {user ? (
+                <>
+                  <Link to="/dashboard">
+                    <CustomButton
+                      variant="secondary"
+                      className="w-full"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      Dashboard
+                    </CustomButton>
+                  </Link>
+                  <CustomButton
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      signOut();
+                      setIsMobileMenuOpen(false);
+                    }}
+                  >
+                    Sign Out
+                  </CustomButton>
+                </>
+              ) : (
+                <>
+                  <Link to="/auth">
+                    <CustomButton
+                      variant="secondary"
+                      className="w-full"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      Sign In
+                    </CustomButton>
+                  </Link>
+                  <Link to="/auth?tab=signup">
+                    <CustomButton
+                      variant="primary"
+                      className="w-full"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      Get Started
+                    </CustomButton>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
