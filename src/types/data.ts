@@ -40,6 +40,9 @@ export type Suborder = {
   details: string | null;
   created_at: string;
   updated_at: string;
+  suppliers?: {
+    name: string;
+  } | null;
 };
 
 export type Tracking = {

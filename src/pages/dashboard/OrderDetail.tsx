@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,14 +25,12 @@ const OrderDetail = () => {
   const [suborders, setSuborders] = useState<Suborder[]>([]);
   const [attachments, setAttachments] = useState<any[]>([]);
 
-  // Fetch order and related data
   useEffect(() => {
     const fetchOrderData = async () => {
       if (!id || !user) return;
       
       setLoading(true);
       try {
-        // Fetch order
         const { data: orderData, error: orderError } = await supabase
           .from('orders')
           .select('*')
@@ -53,7 +50,6 @@ const OrderDetail = () => {
         
         setOrder(orderData);
         
-        // Fetch tracking information
         const { data: trackingData, error: trackingError } = await supabase
           .from('tracking')
           .select('*')
@@ -63,7 +59,6 @@ const OrderDetail = () => {
         if (trackingError) throw trackingError;
         setTrackings(trackingData || []);
         
-        // Fetch payment information
         const { data: paymentData, error: paymentError } = await supabase
           .from('payments')
           .select('*')
@@ -73,7 +68,6 @@ const OrderDetail = () => {
         if (paymentError) throw paymentError;
         setPayments(paymentData || []);
         
-        // Fetch suborders
         const { data: suborderData, error: suborderError } = await supabase
           .from('suborders')
           .select(`
@@ -88,7 +82,6 @@ const OrderDetail = () => {
         if (suborderError) throw suborderError;
         setSuborders(suborderData || []);
         
-        // Fetch attachments
         const { data: attachmentData, error: attachmentError } = await supabase
           .from('order_attachments')
           .select('*')
@@ -112,7 +105,6 @@ const OrderDetail = () => {
     fetchOrderData();
   }, [id, user, navigate, toast]);
 
-  // Format date
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('en-US', {
@@ -145,7 +137,6 @@ const OrderDetail = () => {
     );
   }
 
-  // Status badge color
   const getStatusColorClass = (status: string) => {
     switch (status.toLowerCase()) {
       case 'completed':
@@ -192,7 +183,6 @@ const OrderDetail = () => {
               <TabsTrigger value="payments">Payments</TabsTrigger>
             </TabsList>
 
-            {/* Order Details */}
             <TabsContent value="details">
               <div className="space-y-6">
                 <div>
@@ -228,7 +218,6 @@ const OrderDetail = () => {
               </div>
             </TabsContent>
 
-            {/* Suborders */}
             <TabsContent value="suborders">
               {suborders.length === 0 ? (
                 <div className="py-6 text-center">
@@ -244,7 +233,7 @@ const OrderDetail = () => {
                         <div className="flex justify-between items-start mb-4">
                           <div>
                             <h3 className="font-medium">
-                              {suborder.suppliers ? (suborder.suppliers as any).name : 'No Supplier'}
+                              {suborder.suppliers ? suborder.suppliers.name : 'No Supplier'}
                             </h3>
                             <Badge className={`mt-1 ${getStatusColorClass(suborder.status)}`}>
                               {suborder.status}
@@ -270,7 +259,6 @@ const OrderDetail = () => {
               )}
             </TabsContent>
 
-            {/* Attachments */}
             <TabsContent value="attachments">
               {attachments.length === 0 ? (
                 <div className="py-6 text-center">
@@ -299,7 +287,6 @@ const OrderDetail = () => {
               )}
             </TabsContent>
 
-            {/* Tracking */}
             <TabsContent value="tracking">
               {trackings.length === 0 ? (
                 <div className="py-6 text-center">
@@ -309,12 +296,10 @@ const OrderDetail = () => {
                 </div>
               ) : (
                 <div className="relative space-y-0">
-                  {/* Timeline line */}
                   <div className="absolute left-5 top-6 bottom-6 w-[2px] bg-gray-200"></div>
                   
                   {trackings.map((tracking, index) => (
                     <div key={tracking.id} className="relative pl-14 py-4">
-                      {/* Timeline dot */}
                       <div className={`absolute left-4 top-5 h-4 w-4 rounded-full border-2 
                         ${index === 0 ? 'bg-green-500 border-green-500' : 'bg-white border-gray-300'}`}
                       ></div>
@@ -337,7 +322,6 @@ const OrderDetail = () => {
               )}
             </TabsContent>
 
-            {/* Payments */}
             <TabsContent value="payments">
               {payments.length === 0 ? (
                 <div className="py-6 text-center">
