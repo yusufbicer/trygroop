@@ -4,17 +4,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { OrderAttachment } from '@/types/data';
 import { useToast } from '@/hooks/use-toast';
-import { useFileUpload } from './useFileUpload';
+import { useSupabaseStorage } from './useSupabaseStorage';
 
 export const useOrderAttachments = (orderId?: string) => {
   const { toast } = useToast();
-  const { uploadFile, getFileUrl } = useFileUpload();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
+  const { deleteFile } = useSupabaseStorage();
 
-  // Fetch attachments for an order
+  // Fetch attachments for a specific order
   const { data: attachments = [], isLoading } = useQuery({
-    queryKey: ['orderAttachments', orderId],
+    queryKey: ['order-attachments', orderId],
     queryFn: async () => {
       if (!orderId) return [];
       
@@ -32,53 +32,26 @@ export const useOrderAttachments = (orderId?: string) => {
         return [];
       }
       
-      return data.map((attachment: OrderAttachment) => ({
-        ...attachment,
-        url: getFileUrl(attachment.file_path)
-      })) || [];
+      return data || [];
     },
-    enabled: !!orderId
+    enabled: !!orderId,
   });
 
-  // Add an attachment to an order
+  // Add attachment
   const addAttachment = useMutation({
-    mutationFn: async ({ file, orderId, userId }: { file: File; orderId: string; userId: string }) => {
+    mutationFn: async (newAttachment: Omit<OrderAttachment, 'id' | 'created_at'>) => {
       setLoading(true);
-      
-      // 1. Upload the file to storage
-      const uploadResult = await uploadFile(file, userId);
-      
-      if (!uploadResult) {
-        throw new Error('File upload failed');
-      }
-      
-      // 2. Create the attachment record
-      const newAttachment = {
-        order_id: orderId,
-        file_path: uploadResult.path,
-        file_name: uploadResult.name,
-        file_type: uploadResult.type
-      };
-      
       const { data, error } = await (supabase.from('order_attachments') as any)
         .insert(newAttachment)
         .select()
         .single();
-      
+        
       if (error) throw error;
-      
       setLoading(false);
-      return {
-        ...data,
-        url: getFileUrl(data.file_path)
-      };
+      return data;
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['orderAttachments', variables.orderId] });
-      toast({
-        title: 'Attachment added',
-        description: 'File has been attached to the order successfully.',
-      });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['order-attachments', orderId] });
     },
     onError: (error: any) => {
       toast({
@@ -90,41 +63,32 @@ export const useOrderAttachments = (orderId?: string) => {
     },
   });
 
-  // Delete an attachment
-  const deleteAttachment = useMutation({
-    mutationFn: async ({ id, filePath, orderId }: { id: string; filePath: string; orderId: string }) => {
+  // Delete attachment
+  const removeAttachment = useMutation({
+    mutationFn: async (attachment: OrderAttachment) => {
       setLoading(true);
       
-      // 1. Delete the file from storage
-      const { error: storageError } = await supabase.storage
-        .from('order_attachments')
-        .remove([filePath]);
+      // First delete the file from storage
+      await deleteFile('order_attachments', attachment.file_path);
       
-      if (storageError) {
-        console.error('Error deleting file:', storageError);
-        // Continue with deletion of the record even if file deletion fails
-      }
-      
-      // 2. Delete the attachment record
+      // Then delete the record from database
       const { error } = await (supabase.from('order_attachments') as any)
         .delete()
-        .eq('id', id);
-      
+        .eq('id', attachment.id);
+        
       if (error) throw error;
-      
       setLoading(false);
-      return { id, orderId };
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['orderAttachments', data.orderId] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['order-attachments', orderId] });
       toast({
-        title: 'Attachment deleted',
-        description: 'File has been removed from the order successfully.',
+        title: 'Attachment removed',
+        description: 'Attachment has been removed successfully.',
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Error deleting attachment',
+        title: 'Error removing attachment',
         description: error.message,
         variant: 'destructive',
       });
@@ -136,7 +100,6 @@ export const useOrderAttachments = (orderId?: string) => {
     attachments,
     isLoading: isLoading || loading,
     addAttachment,
-    deleteAttachment,
-    getFileUrl
+    removeAttachment,
   };
 };

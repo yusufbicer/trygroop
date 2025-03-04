@@ -33,6 +33,7 @@ export const useOrders = (userId?: string) => {
       
       return data || [];
     },
+    enabled: !!userId,
   });
 
   // Fetch a single order
@@ -69,10 +70,6 @@ export const useOrders = (userId?: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      toast({
-        title: 'Order created',
-        description: 'Order has been created successfully.',
-      });
     },
     onError: (error: any) => {
       toast({
@@ -100,10 +97,6 @@ export const useOrders = (userId?: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      toast({
-        title: 'Order updated',
-        description: 'Order has been updated successfully.',
-      });
     },
     onError: (error: any) => {
       toast({
@@ -128,10 +121,6 @@ export const useOrders = (userId?: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      toast({
-        title: 'Order deleted',
-        description: 'Order has been deleted successfully.',
-      });
     },
     onError: (error: any) => {
       toast({

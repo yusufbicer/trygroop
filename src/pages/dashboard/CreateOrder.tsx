@@ -8,21 +8,113 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/context/AuthContext';
+import { useOrders } from '@/hooks/useOrders';
+import { Plus, Upload, X, FileText, Image } from 'lucide-react';
+import { useSupabaseStorage } from '@/hooks/useSupabaseStorage';
 
 const CreateOrder = () => {
   const [title, setTitle] = useState('');
   const [details, setDetails] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<{[key: string]: string}>({});
+  
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { createOrder } = useOrders(user?.id);
+  const { uploadFile } = useSupabaseStorage();
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(e.target.files || []);
+    
+    // Create preview URLs for the files
+    selectedFiles.forEach(file => {
+      const fileReader = new FileReader();
+      fileReader.onload = () => {
+        setPreviewUrls(prev => ({
+          ...prev,
+          [file.name]: fileReader.result as string
+        }));
+      };
+      fileReader.readAsDataURL(file);
+    });
+    
+    setFiles(prev => [...prev, ...selectedFiles]);
+  };
+
+  const removeFile = (fileName: string) => {
+    setFiles(prev => prev.filter(file => file.name !== fileName));
+    setPreviewUrls(prev => {
+      const updated = { ...prev };
+      delete updated[fileName];
+      return updated;
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "You must be logged in to create an order.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!title.trim()) {
+      toast({
+        title: "Error",
+        description: "Order title is required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
     
     try {
-      // This is just a placeholder for now
+      // First create the order
+      const newOrder = {
+        user_id: user.id,
+        title,
+        details,
+        status: 'pending'
+      };
+      
+      const order = await createOrder.mutateAsync(newOrder);
+      
+      // Then upload the files if any
+      if (files.length > 0) {
+        for (const file of files) {
+          const filePath = `${user.id}/${order.id}/${file.name}`;
+          const { data, error } = await uploadFile('order_attachments', filePath, file);
+          
+          if (error) {
+            console.error("Error uploading file:", error);
+            toast({
+              title: "Warning",
+              description: `Error uploading ${file.name}, but order was created.`,
+              variant: "destructive",
+            });
+          } else {
+            // Create order attachment record in the database
+            const { error: attachmentError } = await (supabase.from('order_attachments') as any)
+              .insert({
+                order_id: order.id,
+                file_path: filePath,
+                file_name: file.name,
+                file_type: file.type
+              });
+              
+            if (attachmentError) {
+              console.error("Error saving attachment metadata:", attachmentError);
+            }
+          }
+        }
+      }
+      
       toast({
         title: "Order Created",
         description: "Your order has been created successfully.",
@@ -73,6 +165,62 @@ const CreateOrder = () => {
                 rows={5}
               />
             </div>
+            
+            {/* File Upload Section */}
+            <div className="space-y-2">
+              <Label htmlFor="files">Attachments (Optional)</Label>
+              <div className="border border-dashed border-gray-300 rounded-md p-6 text-center">
+                <input
+                  type="file"
+                  id="files"
+                  multiple
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                <Label htmlFor="files" className="cursor-pointer flex flex-col items-center space-y-2">
+                  <Upload className="h-10 w-10 text-gray-400" />
+                  <span className="text-sm font-medium">Click to upload proformas or photos</span>
+                  <span className="text-xs text-gray-500">PDF, JPG, PNG (max 10MB)</span>
+                </Label>
+              </div>
+            </div>
+            
+            {/* Preview of uploaded files */}
+            {files.length > 0 && (
+              <div className="space-y-2">
+                <Label>Uploaded Files</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {files.map((file, index) => (
+                    <div key={index} className="relative bg-gray-100 p-3 rounded-md flex items-center space-x-2">
+                      {file.type.includes('image') ? (
+                        <div className="h-14 w-14 relative bg-gray-200 rounded overflow-hidden">
+                          {previewUrls[file.name] && (
+                            <img 
+                              src={previewUrls[file.name]} 
+                              alt={file.name}
+                              className="h-full w-full object-cover"
+                            />
+                          )}
+                        </div>
+                      ) : (
+                        <FileText className="h-14 w-14 text-blue-500" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{file.name}</p>
+                        <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB</p>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => removeFile(file.name)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
           <CardFooter className="flex justify-between">
             <Button variant="outline" type="button" onClick={() => navigate('/dashboard/orders')}>
