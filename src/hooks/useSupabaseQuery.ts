@@ -27,9 +27,9 @@ export function useSupabaseQuery<T>({
   return useQuery({
     queryKey: key,
     queryFn: async () => {
-      // Build the query
-      // @ts-ignore - Ignoring type check for now until the database types are generated
-      let query = supabase.from(table).select(select);
+      // Use type assertion to bypass TypeScript checks for Supabase client
+      // This avoids the excessive type instantiation error
+      let query = (supabase as any).from(table).select(select);
 
       // Add filter if specified
       if (column && value !== undefined) {
