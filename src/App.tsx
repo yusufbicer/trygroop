@@ -10,6 +10,21 @@ import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./context/AuthContext";
 import Auth from "./pages/Auth";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import AdminRoute from "./components/auth/AdminRoute";
+import DashboardLayout from "./components/layout/DashboardLayout";
+
+// Dashboard pages
+import Orders from "./pages/dashboard/Orders";
+import OrderDetail from "./pages/dashboard/OrderDetail";
+import CreateOrder from "./pages/dashboard/CreateOrder";
+import Suppliers from "./pages/dashboard/Suppliers";
+import Settings from "./pages/dashboard/Settings";
+
+// Admin pages
+import AdminLayout from "./pages/admin/AdminLayout";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminOrders from "./pages/admin/AdminOrders";
 
 const queryClient = new QueryClient();
 
@@ -23,12 +38,33 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            
+            {/* Protected User Dashboard Routes */}
             <Route path="/dashboard" element={
               <ProtectedRoute>
-                <Dashboard />
+                <DashboardLayout />
               </ProtectedRoute>
-            } />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            }>
+              <Route index element={<Dashboard />} />
+              <Route path="orders" element={<Orders />} />
+              <Route path="orders/:id" element={<OrderDetail />} />
+              <Route path="orders/create" element={<CreateOrder />} />
+              <Route path="suppliers" element={<Suppliers />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
+            
+            {/* Protected Admin Routes */}
+            <Route path="/admin" element={
+              <AdminRoute>
+                <AdminLayout />
+              </AdminRoute>
+            }>
+              <Route index element={<AdminDashboard />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route path="orders" element={<AdminOrders />} />
+            </Route>
+            
+            {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

@@ -1,21 +1,16 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
-
-type Profile = {
-  id: string;
-  first_name: string | null;
-  last_name: string | null;
-  created_at: string;
-  updated_at: string;
-};
+import { Profile } from '@/types/data';
 
 type AuthContextType = {
   session: Session | null;
   user: User | null;
   profile: Profile | null;
+  isAdmin: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, metadata?: { first_name?: string; last_name?: string }) => Promise<void>;
@@ -30,6 +25,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -40,6 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
+        checkAdminRole(session.user.id);
       }
       setLoading(false);
     });
@@ -51,8 +48,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
+        checkAdminRole(session.user.id);
       } else {
         setProfile(null);
+        setIsAdmin(false);
       }
       setLoading(false);
     });
@@ -76,6 +75,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setProfile(data);
     } catch (error) {
       console.error('Error fetching profile:', error);
+    }
+  };
+
+  const checkAdminRole = async (userId: string) => {
+    try {
+      // Use type assertion to bypass TypeScript checks
+      const { data, error } = await (supabase.from('user_roles') as any)
+        .select('*')
+        .eq('user_id', userId)
+        .eq('role', 'admin')
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking admin role:', error);
+        return;
+      }
+
+      setIsAdmin(!!data);
+    } catch (error) {
+      console.error('Error checking admin role:', error);
     }
   };
 
@@ -179,6 +198,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         session,
         user,
         profile,
+        isAdmin,
         loading,
         signIn,
         signUp,

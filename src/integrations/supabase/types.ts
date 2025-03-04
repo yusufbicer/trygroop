@@ -9,6 +9,121 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      order_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_path: string
+          file_type: string
+          id: string
+          order_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_path: string
+          file_type: string
+          id?: string
+          order_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          file_type?: string
+          id?: string
+          order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_attachments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: string
+          status: string
+          title: string
+          total_volume: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          status?: string
+          title: string
+          total_volume?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          status?: string
+          title?: string
+          total_volume?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          notes: string | null
+          order_id: string
+          payment_date: string | null
+          payment_method: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          id?: string
+          notes?: string | null
+          order_id: string
+          payment_date?: string | null
+          payment_method?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          notes?: string | null
+          order_id?: string
+          payment_date?: string | null
+          payment_method?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -33,15 +148,164 @@ export type Database = {
         }
         Relationships: []
       }
+      suborders: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: string
+          order_id: string
+          status: string
+          supplier_id: string | null
+          updated_at: string
+          volume_m3: number | null
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          order_id: string
+          status?: string
+          supplier_id?: string | null
+          updated_at?: string
+          volume_m3?: number | null
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          order_id?: string
+          status?: string
+          supplier_id?: string | null
+          updated_at?: string
+          volume_m3?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suborders_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "suborders_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suppliers: {
+        Row: {
+          address: string | null
+          contact_person: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          contact_person?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          contact_person?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      tracking: {
+        Row: {
+          created_at: string
+          id: string
+          location: string | null
+          notes: string | null
+          order_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          location?: string | null
+          notes?: string | null
+          order_id: string
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          location?: string | null
+          notes?: string | null
+          order_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracking_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _user_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
