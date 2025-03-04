@@ -11,6 +11,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useOrders } from '@/hooks/useOrders';
 import { Plus, Upload, X, FileText, Image } from 'lucide-react';
 import { useSupabaseStorage } from '@/hooks/useSupabaseStorage';
+import { supabase } from '@/integrations/supabase/client';
 
 const CreateOrder = () => {
   const [title, setTitle] = useState('');
@@ -75,12 +76,13 @@ const CreateOrder = () => {
     setIsLoading(true);
     
     try {
-      // First create the order
+      // First create the order - now with total_volume included
       const newOrder = {
         user_id: user.id,
         title,
         details,
-        status: 'pending'
+        status: 'pending',
+        total_volume: null // Adding the missing total_volume field
       };
       
       const order = await createOrder.mutateAsync(newOrder);
@@ -99,8 +101,9 @@ const CreateOrder = () => {
               variant: "destructive",
             });
           } else {
-            // Create order attachment record in the database
-            const { error: attachmentError } = await (supabase.from('order_attachments') as any)
+            // Create order attachment record in the database - using imported supabase client
+            const { error: attachmentError } = await supabase
+              .from('order_attachments')
               .insert({
                 order_id: order.id,
                 file_path: filePath,

@@ -14,7 +14,7 @@ export const useOrders = (userId?: string) => {
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['orders', userId],
     queryFn: async () => {
-      let query = (supabase.from('orders') as any).select('*');
+      let query = supabase.from('orders').select('*');
       
       if (userId) {
         query = query.eq('user_id', userId);
@@ -38,7 +38,8 @@ export const useOrders = (userId?: string) => {
 
   // Fetch a single order
   const fetchOrder = async (orderId: string) => {
-    const { data, error } = await (supabase.from('orders') as any)
+    const { data, error } = await supabase
+      .from('orders')
       .select('*')
       .eq('id', orderId)
       .single();
@@ -59,7 +60,8 @@ export const useOrders = (userId?: string) => {
   const createOrder = useMutation({
     mutationFn: async (newOrder: Omit<Order, 'id' | 'created_at' | 'updated_at'>) => {
       setLoading(true);
-      const { data, error } = await (supabase.from('orders') as any)
+      const { data, error } = await supabase
+        .from('orders')
         .insert(newOrder)
         .select()
         .single();
@@ -85,7 +87,8 @@ export const useOrders = (userId?: string) => {
   const updateOrder = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Order> & { id: string }) => {
       setLoading(true);
-      const { data, error } = await (supabase.from('orders') as any)
+      const { data, error } = await supabase
+        .from('orders')
         .update(updates)
         .eq('id', id)
         .select()
@@ -112,7 +115,8 @@ export const useOrders = (userId?: string) => {
   const deleteOrder = useMutation({
     mutationFn: async (id: string) => {
       setLoading(true);
-      const { error } = await (supabase.from('orders') as any)
+      const { error } = await supabase
+        .from('orders')
         .delete()
         .eq('id', id);
         
