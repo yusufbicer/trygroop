@@ -28,7 +28,8 @@ const AdminDashboard = () => {
       if (!isAdmin) return 0;
       
       try {
-        const { count, error } = await (supabase.from('profiles') as any)
+        const { count, error } = await supabase
+          .from('profiles')
           .select('*', { count: 'exact', head: true });
         
         if (error) throw error;
@@ -52,7 +53,8 @@ const AdminDashboard = () => {
       if (!isAdmin) return 0;
       
       try {
-        const { count, error } = await (supabase.from('orders') as any)
+        const { count, error } = await supabase
+          .from('orders')
           .select('*', { count: 'exact', head: true });
         
         if (error) throw error;
@@ -76,7 +78,8 @@ const AdminDashboard = () => {
       if (!isAdmin) return 0;
       
       try {
-        const { count, error } = await (supabase.from('suppliers') as any)
+        const { count, error } = await supabase
+          .from('suppliers')
           .select('*', { count: 'exact', head: true });
         
         if (error) throw error;
@@ -100,7 +103,8 @@ const AdminDashboard = () => {
       if (!isAdmin) return [];
       
       try {
-        const { data, error } = await (supabase.from('orders') as any)
+        const { data, error } = await supabase
+          .from('orders')
           .select('status')
           .order('created_at');
         
@@ -136,22 +140,32 @@ const AdminDashboard = () => {
       if (!isAdmin) return [];
       
       try {
-        const { data, error } = await (supabase.from('orders') as any)
-          .select(`
-            id,
-            title,
-            status,
-            created_at,
-            profiles:user_id (
-              first_name,
-              last_name
-            )
-          `)
+        // Fix: Remove the profiles join and handle the user data separately
+        const { data, error } = await supabase
+          .from('orders')
+          .select('id, title, status, created_at, user_id')
           .order('created_at', { ascending: false })
           .limit(5);
         
         if (error) throw error;
-        return data || [];
+        
+        // Now fetch profile information for each order's user_id
+        const ordersWithProfiles = await Promise.all(
+          (data || []).map(async (order) => {
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('first_name, last_name')
+              .eq('id', order.user_id)
+              .single();
+            
+            return {
+              ...order,
+              profiles: profileData
+            };
+          })
+        );
+        
+        return ordersWithProfiles || [];
       } catch (error: any) {
         toast({
           title: 'Error fetching recent orders',
