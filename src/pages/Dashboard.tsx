@@ -27,7 +27,7 @@ const Dashboard = () => {
     queryFn: async () => {
       if (!user) return [];
       
-      const { data, error } = await (supabase.from('orders') as any)
+      const { data, error } = await supabase.from('orders')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
@@ -49,7 +49,7 @@ const Dashboard = () => {
       if (!user) return;
       
       try {
-        const { count, error } = await (supabase.from('suppliers') as any)
+        const { count, error } = await supabase.from('suppliers')
           .select('*', { count: 'exact', head: true })
           .eq('user_id', user.id);
           
@@ -168,70 +168,6 @@ const Dashboard = () => {
             </p>
           </Card>
         </div>
-        
-        {/* Get Started Section */}
-        <Card className="glass p-8 mb-8">
-          <h2 className="text-xl font-bold text-white mb-4">Get Started with Groop</h2>
-          <p className="text-white/70 mb-6">
-            Complete these steps to start consolidating your imports from Turkey.
-          </p>
-          
-          <div className="space-y-4">
-            <div className="flex items-start gap-4 p-4 rounded-lg bg-white/5">
-              <div className="bg-groop-blue/10 rounded-full p-2 mt-1">
-                <CheckCircle2 className="h-5 w-5 text-groop-blue" />
-              </div>
-              <div>
-                <h3 className="font-medium text-white">Create Your Account</h3>
-                <p className="text-white/70 text-sm">
-                  You've successfully created your account and can now access all features.
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-start gap-4 p-4 rounded-lg bg-white/5">
-              <div className={hasSuppliers ? "bg-groop-blue/10 rounded-full p-2 mt-1" : "bg-white/10 rounded-full p-2 mt-1"}>
-                {hasSuppliers ? (
-                  <CheckCircle2 className="h-5 w-5 text-groop-blue" />
-                ) : (
-                  <PlusCircle className="h-5 w-5 text-white/70" />
-                )}
-              </div>
-              <div>
-                <h3 className="font-medium text-white">Add Your Suppliers</h3>
-                <p className="text-white/70 text-sm">
-                  Add your Turkish suppliers to easily create and manage orders.
-                </p>
-                {!hasSuppliers && (
-                  <CustomButton variant="secondary" size="sm" className="mt-2" onClick={() => navigate('/dashboard/suppliers')}>
-                    Add Suppliers
-                  </CustomButton>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex items-start gap-4 p-4 rounded-lg bg-white/5">
-              <div className={orders.length > 0 ? "bg-groop-blue/10 rounded-full p-2 mt-1" : "bg-white/10 rounded-full p-2 mt-1"}>
-                {orders.length > 0 ? (
-                  <CheckCircle2 className="h-5 w-5 text-groop-blue" />
-                ) : (
-                  <PlusCircle className="h-5 w-5 text-white/70" />
-                )}
-              </div>
-              <div>
-                <h3 className="font-medium text-white">Create Your First Order</h3>
-                <p className="text-white/70 text-sm">
-                  Start consolidating by creating your first order with one or more suppliers.
-                </p>
-                {orders.length === 0 && (
-                  <CustomButton variant="secondary" size="sm" className="mt-2" onClick={() => navigate('/dashboard/orders/create')}>
-                    Create Order
-                  </CustomButton>
-                )}
-              </div>
-            </div>
-          </div>
-        </Card>
         
         {/* Recent Activity */}
         <Card className="glass p-8">
