@@ -12,7 +12,8 @@ const AdminRoute = ({ children }: AdminRouteProps) => {
   const location = useLocation();
 
   useEffect(() => {
-    // This effect is empty but useful for debugging if needed
+    // Log debug information
+    console.log("AdminRoute check:", { user, isAdmin, loading });
   }, [user, isAdmin, loading]);
 
   if (loading) {

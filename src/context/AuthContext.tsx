@@ -61,8 +61,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (userId: string) => {
     try {
-      // Use type assertion to bypass TypeScript checks completely
-      const { data, error } = await (supabase.from('profiles') as any)
+      const { data, error } = await supabase
+        .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
@@ -80,8 +80,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const checkAdminRole = async (userId: string) => {
     try {
-      // Use type assertion to bypass TypeScript checks
-      const { data, error } = await (supabase.from('user_roles') as any)
+      const { data, error } = await supabase
+        .from('user_roles')
         .select('*')
         .eq('user_id', userId)
         .eq('role', 'admin')

@@ -82,3 +82,14 @@ export type Profile = {
   created_at: string;
   updated_at: string;
 };
+
+export type OrderWithDetails = Order & {
+  profile: {
+    first_name: string | null;
+    last_name: string | null;
+  };
+  suborders: Suborder[];
+  tracking: Tracking[];
+  payments: Payment[];
+  attachments: OrderAttachment[];
+};
