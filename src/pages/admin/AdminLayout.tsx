@@ -10,7 +10,8 @@ import {
   LogOut, 
   ChevronDown, 
   Menu, 
-  X
+  X,
+  Truck
 } from 'lucide-react';
 
 const AdminLayout = () => {
@@ -77,17 +78,17 @@ const AdminLayout = () => {
               <Package className="h-5 w-5 mr-3" />
               {isSidebarOpen && <span>Orders</span>}
             </Link>
-          </div>
-          
-          <div className="mt-8 pt-4 border-t border-white/10">
+            
             <Link 
-              to="/admin/settings" 
+              to="/admin/suppliers" 
               className="flex items-center px-3 py-2 text-white/80 hover:bg-white/5 rounded-md transition-colors"
             >
-              <Settings className="h-5 w-5 mr-3" />
-              {isSidebarOpen && <span>Settings</span>}
+              <Truck className="h-5 w-5 mr-3" />
+              {isSidebarOpen && <span>Suppliers</span>}
             </Link>
-            
+          </div>
+          
+          <div className="mt-8 pt-4 border-t border-white/10">            
             <button 
               onClick={handleSignOut}
               className="w-full flex items-center px-3 py-2 text-white/80 hover:bg-white/5 rounded-md transition-colors"
@@ -155,18 +156,18 @@ const AdminLayout = () => {
               <Package className="h-5 w-5 mr-3" />
               <span>Orders</span>
             </Link>
-          </div>
-          
-          <div className="mt-8 pt-4 border-t border-white/10">
+            
             <Link 
-              to="/admin/settings" 
+              to="/admin/suppliers" 
               className="flex items-center px-3 py-2 text-white/80 hover:bg-white/5 rounded-md transition-colors"
               onClick={closeMobileMenu}
             >
-              <Settings className="h-5 w-5 mr-3" />
-              <span>Settings</span>
+              <Truck className="h-5 w-5 mr-3" />
+              <span>Suppliers</span>
             </Link>
-            
+          </div>
+          
+          <div className="mt-8 pt-4 border-t border-white/10">
             <button 
               onClick={handleSignOut}
               className="w-full flex items-center px-3 py-2 text-white/80 hover:bg-white/5 rounded-md transition-colors"

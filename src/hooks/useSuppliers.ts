@@ -4,19 +4,22 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Supplier } from '@/types/data';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/AuthContext';
 
 export const useSuppliers = (userId?: string) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
+  const { isAdmin } = useAuth();
 
   // Fetch suppliers
   const { data: suppliers = [], isLoading } = useQuery({
-    queryKey: ['suppliers', userId],
+    queryKey: ['suppliers', userId, isAdmin],
     queryFn: async () => {
       let query = (supabase.from('suppliers') as any).select('*');
       
-      if (userId) {
+      // If admin, fetch all suppliers; otherwise, fetch only user's suppliers
+      if (!isAdmin && userId) {
         query = query.eq('user_id', userId);
       }
       
