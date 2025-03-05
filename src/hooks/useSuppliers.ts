@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,9 +15,10 @@ export const useSuppliers = (userId?: string) => {
   const { data: suppliers = [], isLoading } = useQuery({
     queryKey: ['suppliers', userId, isAdmin],
     queryFn: async () => {
-      let query = (supabase.from('suppliers') as any).select('*');
+      let query = supabase.from('suppliers').select('*');
       
-      // If admin, fetch all suppliers; otherwise, fetch only user's suppliers
+      // If admin and no specific userId is provided, fetch all suppliers
+      // Otherwise, if not admin or a specific userId is provided, filter by user_id
       if (!isAdmin && userId) {
         query = query.eq('user_id', userId);
       }
@@ -42,7 +42,8 @@ export const useSuppliers = (userId?: string) => {
   const createSupplier = useMutation({
     mutationFn: async (newSupplier: Omit<Supplier, 'id' | 'created_at' | 'updated_at'>) => {
       setLoading(true);
-      const { data, error } = await (supabase.from('suppliers') as any)
+      const { data, error } = await supabase
+        .from('suppliers')
         .insert(newSupplier)
         .select()
         .single();
@@ -72,7 +73,8 @@ export const useSuppliers = (userId?: string) => {
   const updateSupplier = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Supplier> & { id: string }) => {
       setLoading(true);
-      const { data, error } = await (supabase.from('suppliers') as any)
+      const { data, error } = await supabase
+        .from('suppliers')
         .update(updates)
         .eq('id', id)
         .select()
@@ -103,7 +105,8 @@ export const useSuppliers = (userId?: string) => {
   const deleteSupplier = useMutation({
     mutationFn: async (id: string) => {
       setLoading(true);
-      const { error } = await (supabase.from('suppliers') as any)
+      const { error } = await supabase
+        .from('suppliers')
         .delete()
         .eq('id', id);
         

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOrders } from '@/hooks/useOrders';
@@ -32,7 +31,7 @@ import { Badge } from '@/components/ui/badge';
 
 const AdminOrders = () => {
   const navigate = useNavigate();
-  const { orders, isLoading, deleteOrder, fetchOrderWithDetails } = useOrders();
+  const { orders, isLoading, deleteOrder } = useOrders();
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
 
@@ -63,25 +62,8 @@ const AdminOrders = () => {
     }
   };
 
-  const handleViewOrder = async (orderId: string) => {
-    try {
-      const orderDetails = await fetchOrderWithDetails(orderId);
-      if (orderDetails) {
-        console.log("Order details:", orderDetails);
-        // Navigate to order detail page or show modal with order details
-        // For now, just show a toast
-        toast({
-          title: 'Order details',
-          description: `Viewing order: ${orderDetails.title}`,
-        });
-      }
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch order details',
-        variant: 'destructive',
-      });
-    }
+  const handleViewOrder = (orderId: string) => {
+    navigate(`/admin/orders/${orderId}`);
   };
 
   const handleDeleteOrder = async (orderId: string) => {

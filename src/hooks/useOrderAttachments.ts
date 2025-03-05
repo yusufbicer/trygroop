@@ -1,105 +1,126 @@
 
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { OrderAttachment } from '@/types/data';
 import { useToast } from '@/hooks/use-toast';
-import { useSupabaseStorage } from './useSupabaseStorage';
 
-export const useOrderAttachments = (orderId?: string) => {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+export const useOrderAttachments = () => {
   const [loading, setLoading] = useState(false);
-  const { deleteFile } = useSupabaseStorage();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
-  // Fetch attachments for a specific order
-  const { data: attachments = [], isLoading } = useQuery({
-    queryKey: ['order-attachments', orderId],
-    queryFn: async () => {
-      if (!orderId) return [];
+  // Upload attachment
+  const uploadAttachment = async (orderId: string, file: File) => {
+    setLoading(true);
+    try {
+      // Validate file type
+      const allowedTypes = [
+        'application/pdf', 
+        'application/msword', 
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      ];
       
-      const { data, error } = await (supabase.from('order_attachments') as any)
-        .select('*')
-        .eq('order_id', orderId)
-        .order('created_at', { ascending: false });
-      
-      if (error) {
-        toast({
-          title: 'Error fetching attachments',
-          description: error.message,
-          variant: 'destructive',
-        });
-        return [];
+      if (!allowedTypes.includes(file.type)) {
+        throw new Error('Invalid file type. Only PDF, DOC, DOCX, XLS, and XLSX files are allowed.');
       }
       
-      return data || [];
-    },
-    enabled: !!orderId,
-  });
-
-  // Add attachment
-  const addAttachment = useMutation({
-    mutationFn: async (newAttachment: Omit<OrderAttachment, 'id' | 'created_at'>) => {
-      setLoading(true);
-      const { data, error } = await (supabase.from('order_attachments') as any)
-        .insert(newAttachment)
-        .select()
-        .single();
+      // Upload file to storage
+      const filePath = `order_attachments/${orderId}/${Date.now()}_${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('order_attachments')
+        .upload(filePath, file);
         
-      if (error) throw error;
+      if (uploadError) throw uploadError;
+      
+      // Add file record to the database
+      const { error: dbError } = await supabase
+        .from('order_attachments')
+        .insert({
+          order_id: orderId,
+          file_path: filePath,
+          file_name: file.name,
+          file_type: file.type,
+        });
+        
+      if (dbError) throw dbError;
+      
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
       setLoading(false);
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['order-attachments', orderId] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Error adding attachment',
-        description: error.message,
-        variant: 'destructive',
-      });
+      return { success: true };
+      
+    } catch (error: any) {
       setLoading(false);
-    },
-  });
+      throw error;
+    }
+  };
 
   // Delete attachment
-  const removeAttachment = useMutation({
-    mutationFn: async (attachment: OrderAttachment) => {
-      setLoading(true);
+  const deleteAttachment = async (attachment: OrderAttachment) => {
+    setLoading(true);
+    try {
+      // Delete file from storage
+      const { error: storageError } = await supabase.storage
+        .from('order_attachments')
+        .remove([attachment.file_path]);
+        
+      if (storageError) throw storageError;
       
-      // First delete the file from storage
-      await deleteFile('order_attachments', attachment.file_path);
-      
-      // Then delete the record from database
-      const { error } = await (supabase.from('order_attachments') as any)
+      // Delete record from database
+      const { error: dbError } = await supabase
+        .from('order_attachments')
         .delete()
         .eq('id', attachment.id);
         
+      if (dbError) throw dbError;
+      
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      setLoading(false);
+      return { success: true };
+      
+    } catch (error: any) {
+      setLoading(false);
+      throw error;
+    }
+  };
+
+  // Download attachment
+  const downloadAttachment = async (attachment: OrderAttachment) => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.storage
+        .from('order_attachments')
+        .download(attachment.file_path);
+        
       if (error) throw error;
+      
+      // Create a download link
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = attachment.file_name;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      a.remove();
+      
       setLoading(false);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['order-attachments', orderId] });
-      toast({
-        title: 'Attachment removed',
-        description: 'Attachment has been removed successfully.',
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Error removing attachment',
-        description: error.message,
-        variant: 'destructive',
-      });
+      return { success: true };
+      
+    } catch (error: any) {
       setLoading(false);
-    },
-  });
+      throw error;
+    }
+  };
 
   return {
-    attachments,
-    isLoading: isLoading || loading,
-    addAttachment,
-    removeAttachment,
+    loading,
+    uploadAttachment,
+    deleteAttachment,
+    downloadAttachment
   };
 };

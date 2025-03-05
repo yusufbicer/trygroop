@@ -1,134 +1,197 @@
 
 import { useState } from 'react';
 import { useSuppliers } from '@/hooks/useSuppliers';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
-import { CustomButton } from '@/components/ui/CustomButton';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Search, Truck, Plus, Edit, Trash, Mail, Phone, MapPin, User } from 'lucide-react';
-import { 
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Supplier } from '@/types/data';
-import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { BuildingWarehouse, Plus, Search, Edit, Trash, MoreHorizontal, Users } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useEffect } from 'react';
 
 const AdminSuppliers = () => {
-  const { user } = useAuth();
-  // Pass no userId to fetch all suppliers as admin
   const { suppliers, isLoading, createSupplier, updateSupplier, deleteSupplier } = useSuppliers();
   const [searchTerm, setSearchTerm] = useState('');
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
-  const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    contact_person: '',
-    email: '',
-    phone: '',
-    address: ''
+  const { toast } = useToast();
+  const [userNames, setUserNames] = useState<{[key: string]: string}>({});
+
+  const formSchema = z.object({
+    name: z.string().min(1, "Name is required"),
+    contact_person: z.string().optional().nullable(),
+    email: z.string().email("Invalid email").optional().nullable(),
+    phone: z.string().optional().nullable(),
+    address: z.string().optional().nullable(),
+    user_id: z.string()
   });
 
-  const filteredSuppliers = suppliers.filter((supplier) => 
-    supplier.name.toLowerCase().includes(searchTerm.toLowerCase())
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      contact_person: "",
+      email: "",
+      phone: "",
+      address: "",
+      user_id: ""
+    }
+  });
+
+  // Fetch user names when component mounts
+  useEffect(() => {
+    const fetchUserNames = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name');
+      
+      if (data) {
+        const namesMap: {[key: string]: string} = {};
+        data.forEach(user => {
+          namesMap[user.id] = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.id;
+        });
+        setUserNames(namesMap);
+      }
+    };
+    
+    fetchUserNames();
+  }, []);
+
+  const filteredSuppliers = suppliers.filter(supplier =>
+    supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (supplier.contact_person && supplier.contact_person.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (supplier.email && supplier.email.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const handleOpenDialog = (supplier?: Supplier) => {
-    if (supplier) {
-      setEditingSupplier(supplier);
-      setFormData({
-        name: supplier.name,
-        contact_person: supplier.contact_person || '',
-        email: supplier.email || '',
-        phone: supplier.phone || '',
-        address: supplier.address || ''
-      });
-    } else {
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    try {
+      if (editingSupplier) {
+        await updateSupplier.mutateAsync({
+          ...values,
+          id: editingSupplier.id,
+          created_at: editingSupplier.created_at,
+          updated_at: new Date().toISOString()
+        });
+        toast({
+          title: "Success",
+          description: "Supplier updated successfully"
+        });
+      } else {
+        await createSupplier.mutateAsync({
+          ...values,
+          user_id: values.user_id
+        });
+        toast({
+          title: "Success",
+          description: "Supplier created successfully"
+        });
+      }
+      setDialogOpen(false);
+      form.reset();
       setEditingSupplier(null);
-      setFormData({
-        name: '',
-        contact_person: '',
-        email: '',
-        phone: '',
-        address: ''
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save supplier",
+        variant: "destructive"
       });
     }
-    setIsDialogOpen(true);
   };
 
-  const handleCloseDialog = () => {
-    setIsDialogOpen(false);
+  const handleEdit = (supplier: Supplier) => {
+    setEditingSupplier(supplier);
+    form.reset({
+      name: supplier.name,
+      contact_person: supplier.contact_person,
+      email: supplier.email,
+      phone: supplier.phone,
+      address: supplier.address,
+      user_id: supplier.user_id
+    });
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteSupplier.mutateAsync(id);
+      toast({
+        title: "Success",
+        description: "Supplier deleted successfully"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete supplier",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAddNew = () => {
     setEditingSupplier(null);
+    form.reset({
+      name: "",
+      contact_person: "",
+      email: "",
+      phone: "",
+      address: "",
+      user_id: ""
+    });
+    setDialogOpen(true);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!user) return;
-    
-    if (editingSupplier) {
-      updateSupplier.mutate({
-        id: editingSupplier.id,
-        ...formData
-      });
-    } else {
-      createSupplier.mutate({
-        user_id: user.id,
-        ...formData
-      });
-    }
-    
-    handleCloseDialog();
-  };
-
-  const handleOpenDeleteDialog = (supplier: Supplier) => {
-    setSupplierToDelete(supplier);
-    setIsDeleteDialogOpen(true);
-  };
-
-  const handleConfirmDelete = () => {
-    if (supplierToDelete) {
-      deleteSupplier.mutate(supplierToDelete.id);
-    }
-    setIsDeleteDialogOpen(false);
-    setSupplierToDelete(null);
+  const getUserName = (userId: string) => {
+    return userNames[userId] || userId;
   };
 
   return (
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white mb-1">All Suppliers</h1>
-          <p className="text-white/70">Manage all supplier information across the platform</p>
+          <h1 className="text-2xl font-bold text-white mb-1">Manage Suppliers</h1>
+          <p className="text-white/70">View and manage supplier information</p>
         </div>
-        <CustomButton 
-          variant="primary" 
-          size="sm" 
-          className="mt-4 sm:mt-0" 
-          onClick={() => handleOpenDialog()}
-        >
-          <Plus className="h-4 w-4 mr-2" /> Add Supplier
-        </CustomButton>
       </div>
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 space-y-4 sm:space-y-0">
@@ -142,6 +205,9 @@ const AdminSuppliers = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        <Button onClick={handleAddNew}>
+          <Plus className="mr-2 h-4 w-4" /> Add Supplier
+        </Button>
       </div>
 
       {isLoading ? (
@@ -151,180 +217,180 @@ const AdminSuppliers = () => {
       ) : filteredSuppliers.length === 0 ? (
         <Card className="glass">
           <CardContent className="py-10 text-center">
-            <Truck className="h-12 w-12 text-white/30 mx-auto mb-3" />
+            <BuildingWarehouse className="h-12 w-12 text-white/30 mx-auto mb-3" />
             <h3 className="text-lg font-medium text-white mb-1">No suppliers found</h3>
             <p className="text-white/70 mb-4">
-              {searchTerm 
-                ? "No suppliers match your search criteria" 
-                : "No suppliers have been added yet"}
+              {searchTerm ? "No suppliers match your search criteria" : "There are no suppliers in the system"}
             </p>
-            <CustomButton 
-              variant="secondary" 
-              onClick={() => handleOpenDialog()}
-            >
-              <Plus className="h-4 w-4 mr-2" /> Add First Supplier
-            </CustomButton>
+            <Button onClick={handleAddNew}>
+              <Plus className="mr-2 h-4 w-4" /> Add Supplier
+            </Button>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredSuppliers.map((supplier) => (
-            <Card key={supplier.id} className="glass">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <CardTitle className="text-lg">{supplier.name}</CardTitle>
-                  <div className="flex space-x-2">
-                    <button 
-                      onClick={() => handleOpenDialog(supplier)} 
-                      className="text-white/70 hover:text-white transition-colors"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button 
-                      onClick={() => handleOpenDeleteDialog(supplier)} 
-                      className="text-white/70 hover:text-red-500 transition-colors"
-                    >
-                      <Trash className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-                <CardDescription>
-                  Supplier
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {supplier.contact_person && (
-                    <div className="flex items-start">
-                      <User className="h-4 w-4 mt-1 mr-2 text-white/50" />
-                      <span className="text-sm text-white/70">{supplier.contact_person}</span>
-                    </div>
-                  )}
-                  {supplier.email && (
-                    <div className="flex items-start">
-                      <Mail className="h-4 w-4 mt-1 mr-2 text-white/50" />
-                      <span className="text-sm text-white/70">{supplier.email}</span>
-                    </div>
-                  )}
-                  {supplier.phone && (
-                    <div className="flex items-start">
-                      <Phone className="h-4 w-4 mt-1 mr-2 text-white/50" />
-                      <span className="text-sm text-white/70">{supplier.phone}</span>
-                    </div>
-                  )}
-                  {supplier.address && (
-                    <div className="flex items-start">
-                      <MapPin className="h-4 w-4 mt-1 mr-2 text-white/50" />
-                      <span className="text-sm text-white/70">{supplier.address}</span>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <Card className="glass">
+          <CardHeader>
+            <CardTitle className="text-lg">All Suppliers</CardTitle>
+            <CardDescription>Total: {filteredSuppliers.length} suppliers</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Created By</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredSuppliers.map((supplier) => (
+                  <TableRow key={supplier.id}>
+                    <TableCell className="font-medium">{supplier.name}</TableCell>
+                    <TableCell>{supplier.contact_person || '-'}</TableCell>
+                    <TableCell>{supplier.email || '-'}</TableCell>
+                    <TableCell>{supplier.phone || '-'}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center">
+                        <Users className="h-4 w-4 mr-2 text-white/50" />
+                        {getUserName(supplier.user_id)}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEdit(supplier)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDelete(supplier.id)}>
+                            <Trash className="mr-2 h-4 w-4 text-red-500" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Add/Edit Supplier Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingSupplier ? 'Edit Supplier' : 'Add New Supplier'}</DialogTitle>
+            <DialogTitle>{editingSupplier ? 'Edit Supplier' : 'Add Supplier'}</DialogTitle>
+            <DialogDescription>
+              {editingSupplier ? 'Update supplier information' : 'Add a new supplier to the system'}
+            </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Supplier Name*</Label>
-              <Input
-                id="name"
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
                 name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                placeholder="Enter supplier name"
-                required
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Supplier name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="contact_person">Contact Person</Label>
-              <Input
-                id="contact_person"
+              <FormField
+                control={form.control}
                 name="contact_person"
-                value={formData.contact_person}
-                onChange={handleInputChange}
-                placeholder="Enter contact person"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contact Person</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Contact person" {...field} value={field.value || ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
+              <FormField
+                control={form.control}
                 name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                placeholder="Enter email address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Email address" {...field} value={field.value || ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
-              <Input
-                id="phone"
+              <FormField
+                control={form.control}
                 name="phone"
-                value={formData.phone}
-                onChange={handleInputChange}
-                placeholder="Enter phone number"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Phone number" {...field} value={field.value || ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
-              <Textarea
-                id="address"
+              <FormField
+                control={form.control}
                 name="address"
-                value={formData.address}
-                onChange={handleInputChange}
-                placeholder="Enter address"
-                rows={3}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Address</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Address" {...field} value={field.value || ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            
-            <div className="flex justify-end space-x-2 pt-2">
-              <CustomButton 
-                type="button" 
-                variant="outline" 
-                onClick={handleCloseDialog}
-              >
-                Cancel
-              </CustomButton>
-              <CustomButton type="submit" variant="primary">
-                {editingSupplier ? 'Update' : 'Add'} Supplier
-              </CustomButton>
-            </div>
-          </form>
+              <FormField
+                control={form.control}
+                name="user_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>User</FormLabel>
+                    <FormControl>
+                      <select
+                        className="w-full p-2 rounded-md bg-background border border-input"
+                        {...field}
+                      >
+                        <option value="">Select User</option>
+                        {Object.entries(userNames).map(([id, name]) => (
+                          <option key={id} value={id}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button type="submit">{editingSupplier ? 'Update' : 'Create'}</Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the supplier
-              {supplierToDelete?.name && <strong> "{supplierToDelete.name}"</strong>} and
-              remove it from your database.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete} className="bg-red-500 hover:bg-red-600">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };
