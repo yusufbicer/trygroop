@@ -10,8 +10,7 @@ import {
   LogOut, 
   ChevronDown, 
   Menu, 
-  X,
-  Home
+  X
 } from 'lucide-react';
 
 const AdminLayout = () => {
@@ -77,14 +76,6 @@ const AdminLayout = () => {
             >
               <Package className="h-5 w-5 mr-3" />
               {isSidebarOpen && <span>Orders</span>}
-            </Link>
-            
-            <Link 
-              to="/dashboard" 
-              className="flex items-center px-3 py-2 text-white/80 hover:bg-white/5 rounded-md transition-colors"
-            >
-              <Home className="h-5 w-5 mr-3" />
-              {isSidebarOpen && <span>User Dashboard</span>}
             </Link>
           </div>
           
@@ -163,15 +154,6 @@ const AdminLayout = () => {
             >
               <Package className="h-5 w-5 mr-3" />
               <span>Orders</span>
-            </Link>
-            
-            <Link 
-              to="/dashboard" 
-              className="flex items-center px-3 py-2 text-white/80 hover:bg-white/5 rounded-md transition-colors"
-              onClick={closeMobileMenu}
-            >
-              <Home className="h-5 w-5 mr-3" />
-              <span>User Dashboard</span>
             </Link>
           </div>
           

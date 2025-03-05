@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,16 +15,28 @@ export const useOrders = (userId?: string) => {
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['orders', userId, isAdmin],
     queryFn: async () => {
-      let query = supabase.from('orders').select('*');
-      
-      // If not admin or userId is specified, filter by user_id
-      if (!isAdmin || userId) {
-        query = query.eq('user_id', userId);
-      }
-      
-      const { data, error } = await query.order('created_at', { ascending: false });
-      
-      if (error) {
+      try {
+        let query = supabase.from('orders').select('*');
+        
+        // If not admin or userId is specified, filter by user_id
+        if (!isAdmin || userId) {
+          query = query.eq('user_id', userId);
+        }
+        
+        const { data, error } = await query.order('created_at', { ascending: false });
+        
+        if (error) {
+          toast({
+            title: 'Error fetching orders',
+            description: error.message,
+            variant: 'destructive',
+          });
+          return [];
+        }
+        
+        return data || [];
+      } catch (error: any) {
+        console.error('Error in useOrders:', error);
         toast({
           title: 'Error fetching orders',
           description: error.message,
@@ -33,8 +44,6 @@ export const useOrders = (userId?: string) => {
         });
         return [];
       }
-      
-      return data || [];
     },
     enabled: isAdmin || !!userId,
   });
@@ -56,7 +65,11 @@ export const useOrders = (userId?: string) => {
         .from('profiles')
         .select('first_name, last_name')
         .eq('id', order.user_id)
-        .single();
+        .maybeSingle();
+      
+      if (profileError) {
+        console.error('Error fetching user profile:', profileError);
+      }
       
       // Get suborders
       const { data: suborders, error: subordersError } = await supabase
