@@ -179,7 +179,7 @@ const AdminOrderDetail = () => {
         await createSuborder.mutateAsync({
           order_id: id!,
           status: values.status,
-          details: values.details || null,
+          details: values.details || '',
           supplier_id: values.supplier_id || null,
           volume_m3: values.volume_m3 || null,
         });
@@ -216,8 +216,8 @@ const AdminOrderDetail = () => {
         await createTracking.mutateAsync({
           order_id: id!,
           status: values.status,
-          location: values.location || null,
-          notes: values.notes || null,
+          location: values.location || '',
+          notes: values.notes || '',
         });
         toast({
           title: 'Success',
@@ -254,9 +254,9 @@ const AdminOrderDetail = () => {
           amount: values.amount,
           currency: values.currency,
           status: values.status,
-          payment_method: values.payment_method || null,
+          payment_method: values.payment_method || '',
           payment_date: values.payment_date || null,
-          notes: values.notes || null,
+          notes: values.notes || '',
         });
         toast({
           title: 'Success',
@@ -707,7 +707,7 @@ const AdminOrderDetail = () => {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="">No supplier</SelectItem>
-                            {suppliers.map((supplier) => (
+                            {suppliers?.map((supplier) => (
                               <SelectItem key={supplier.id} value={supplier.id}>
                                 {supplier.name}
                               </SelectItem>
