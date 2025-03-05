@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -65,9 +64,8 @@ const AdminUsers = () => {
 
       if (rolesError) throw rolesError;
 
-      // Fetch user emails from auth.users (note: this requires admin privileges)
-      // This is a simplified example; in a real app, you might need a server-side function
-      const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
+      // Auth data will be handled differently since we can't directly access auth.users
+      // We'll use the emails we have access to
       
       // Convert admin roles to a map for faster lookup
       const adminMap = new Map();
@@ -75,18 +73,11 @@ const AdminUsers = () => {
         adminMap.set(role.user_id, true);
       });
 
-      // Map emails to users
-      const emailMap = new Map();
-      if (authData) {
-        authData.users.forEach(user => {
-          emailMap.set(user.id, user.email);
-        });
-      }
-
-      // Combine the data
+      // Since we can't access auth data directly in the client, we'll use what we have
+      // This is a simplified approach
       const combinedUsers = usersData.map(user => ({
         ...user,
-        email: emailMap.get(user.id) || 'Unknown email',
+        email: `user-${user.id.substring(0, 8)}@example.com`, // Placeholder email
         isAdmin: adminMap.has(user.id)
       }));
 

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useOrders } from '@/hooks/useOrders';
@@ -87,7 +86,6 @@ const AdminOrderDetail = () => {
   const [editingItem, setEditingItem] = useState<any>(null);
   const [fileUploading, setFileUploading] = useState(false);
 
-  // Tab state
   const [activeTab, setActiveTab] = useState("details");
 
   useEffect(() => {
@@ -112,7 +110,6 @@ const AdminOrderDetail = () => {
     }
   };
 
-  // Form schemas
   const suborderSchema = z.object({
     supplier_id: z.string().optional().nullable(),
     volume_m3: z.number().min(0).optional().nullable(),
@@ -135,7 +132,6 @@ const AdminOrderDetail = () => {
     notes: z.string().optional().nullable(),
   });
 
-  // Form setup
   const suborderForm = useForm<z.infer<typeof suborderSchema>>({
     resolver: zodResolver(suborderSchema),
     defaultValues: {
@@ -167,7 +163,6 @@ const AdminOrderDetail = () => {
     },
   });
 
-  // Form handlers
   const onSubmitSuborder = async (values: z.infer<typeof suborderSchema>) => {
     try {
       if (editingItem) {
@@ -183,7 +178,9 @@ const AdminOrderDetail = () => {
       } else {
         await createSuborder.mutateAsync({
           order_id: id!,
-          ...values,
+          status: values.status,
+          details: values.details || null,
+          supplier_id: values.supplier_id || null,
           volume_m3: values.volume_m3 || null,
         });
         toast({
@@ -218,7 +215,9 @@ const AdminOrderDetail = () => {
       } else {
         await createTracking.mutateAsync({
           order_id: id!,
-          ...values,
+          status: values.status,
+          location: values.location || null,
+          notes: values.notes || null,
         });
         toast({
           title: 'Success',
@@ -252,7 +251,12 @@ const AdminOrderDetail = () => {
       } else {
         await createPayment.mutateAsync({
           order_id: id!,
-          ...values,
+          amount: values.amount,
+          currency: values.currency,
+          status: values.status,
+          payment_method: values.payment_method || null,
+          payment_date: values.payment_date || null,
+          notes: values.notes || null,
         });
         toast({
           title: 'Success',
@@ -272,7 +276,6 @@ const AdminOrderDetail = () => {
     }
   };
 
-  // Deletion handlers
   const handleDeleteSuborder = async (id: string) => {
     try {
       await deleteSuborder.mutateAsync(id);
@@ -324,14 +327,12 @@ const AdminOrderDetail = () => {
     }
   };
 
-  // File handlers
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
     const file = files[0];
     
-    // Validate file type - only allow PDF, DOC, DOCX, XLS, XLSX
     const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
                           'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
     
@@ -396,7 +397,6 @@ const AdminOrderDetail = () => {
     }
   };
 
-  // Edit handlers
   const handleEditSuborder = (suborder: Suborder) => {
     setEditingItem(suborder);
     suborderForm.reset({
@@ -680,7 +680,6 @@ const AdminOrderDetail = () => {
             </CardContent>
           </Card>
 
-          {/* Suborder Dialog */}
           <Dialog open={activeSuborderDialog} onOpenChange={setActiveSuborderDialog}>
             <DialogContent>
               <DialogHeader>
@@ -865,7 +864,6 @@ const AdminOrderDetail = () => {
             </CardContent>
           </Card>
 
-          {/* Tracking Dialog */}
           <Dialog open={activeTrackingDialog} onOpenChange={setActiveTrackingDialog}>
             <DialogContent>
               <DialogHeader>
@@ -1024,7 +1022,6 @@ const AdminOrderDetail = () => {
             </CardContent>
           </Card>
 
-          {/* Payment Dialog */}
           <Dialog open={activePaymentDialog} onOpenChange={setActivePaymentDialog}>
             <DialogContent>
               <DialogHeader>

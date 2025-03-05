@@ -46,7 +46,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { BuildingWarehouse, Plus, Search, Edit, Trash, MoreHorizontal, Users } from 'lucide-react';
+import { Warehouse, Plus, Search, Edit, Trash, MoreHorizontal, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect } from 'react';
 
@@ -119,7 +119,11 @@ const AdminSuppliers = () => {
         });
       } else {
         await createSupplier.mutateAsync({
-          ...values,
+          name: values.name,
+          contact_person: values.contact_person || null,
+          email: values.email || null,
+          phone: values.phone || null,
+          address: values.address || null,
           user_id: values.user_id
         });
         toast({
@@ -217,7 +221,7 @@ const AdminSuppliers = () => {
       ) : filteredSuppliers.length === 0 ? (
         <Card className="glass">
           <CardContent className="py-10 text-center">
-            <BuildingWarehouse className="h-12 w-12 text-white/30 mx-auto mb-3" />
+            <Warehouse className="h-12 w-12 text-white/30 mx-auto mb-3" />
             <h3 className="text-lg font-medium text-white mb-1">No suppliers found</h3>
             <p className="text-white/70 mb-4">
               {searchTerm ? "No suppliers match your search criteria" : "There are no suppliers in the system"}
