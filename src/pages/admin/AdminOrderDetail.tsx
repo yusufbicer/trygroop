@@ -67,13 +67,14 @@ import {
   Calendar,
   MapPin,
   DollarSign,
+  Save,
 } from 'lucide-react';
 
 const AdminOrderDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { fetchOrderWithDetails, createSuborder, updateSuborder, deleteSuborder, 
          createTracking, updateTracking, deleteTracking, 
-         createPayment, updatePayment, deletePayment } = useOrders();
+         createPayment, updatePayment, deletePayment, updateOrder } = useOrders();
   const { suppliers } = useSuppliers();
   const { uploadAttachment, deleteAttachment, downloadAttachment } = useOrderAttachments();
   const { toast } = useToast();
@@ -85,6 +86,7 @@ const AdminOrderDetail = () => {
   const [activePaymentDialog, setActivePaymentDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [fileUploading, setFileUploading] = useState(false);
+  const [isUpdatingOrderStatus, setIsUpdatingOrderStatus] = useState(false);
 
   const [activeTab, setActiveTab] = useState("details");
 
@@ -107,6 +109,37 @@ const AdminOrderDetail = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleUpdateOrderStatus = async (newStatus: string) => {
+    if (!order || order.status === newStatus) return;
+    
+    setIsUpdatingOrderStatus(true);
+    try {
+      await updateOrder.mutateAsync({
+        id: order.id,
+        status: newStatus
+      });
+      
+      // Update local state
+      setOrder(prev => ({
+        ...prev,
+        status: newStatus
+      }));
+      
+      toast({
+        title: 'Status Updated',
+        description: `Order status has been changed to ${newStatus}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update order status',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdatingOrderStatus(false);
     }
   };
 
@@ -138,7 +171,7 @@ const AdminOrderDetail = () => {
       supplier_id: null,
       volume_m3: null,
       status: 'pending',
-      details: null,
+      details: '',
     },
   });
 
@@ -146,8 +179,8 @@ const AdminOrderDetail = () => {
     resolver: zodResolver(trackingSchema),
     defaultValues: {
       status: 'pending',
-      location: null,
-      notes: null,
+      location: '',
+      notes: '',
     },
   });
 
@@ -157,9 +190,9 @@ const AdminOrderDetail = () => {
       amount: 0,
       currency: 'USD',
       status: 'pending',
-      payment_method: null,
+      payment_method: '',
       payment_date: null,
-      notes: null,
+      notes: '',
     },
   });
 
@@ -193,6 +226,7 @@ const AdminOrderDetail = () => {
       suborderForm.reset();
       loadOrderDetails();
     } catch (error: any) {
+      console.error("Error saving suborder:", error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to save suborder',
@@ -403,7 +437,7 @@ const AdminOrderDetail = () => {
       supplier_id: suborder.supplier_id,
       volume_m3: suborder.volume_m3 || null,
       status: suborder.status,
-      details: suborder.details,
+      details: suborder.details || '',
     });
     setActiveSuborderDialog(true);
   };
@@ -412,8 +446,8 @@ const AdminOrderDetail = () => {
     setEditingItem(tracking);
     trackingForm.reset({
       status: tracking.status,
-      location: tracking.location,
-      notes: tracking.notes,
+      location: tracking.location || '',
+      notes: tracking.notes || '',
     });
     setActiveTrackingDialog(true);
   };
@@ -424,9 +458,9 @@ const AdminOrderDetail = () => {
       amount: payment.amount,
       currency: payment.currency,
       status: payment.status,
-      payment_method: payment.payment_method,
+      payment_method: payment.payment_method || '',
       payment_date: payment.payment_date ? new Date(payment.payment_date).toISOString().split('T')[0] : null,
-      notes: payment.notes,
+      notes: payment.notes || '',
     });
     setActivePaymentDialog(true);
   };
@@ -482,7 +516,29 @@ const AdminOrderDetail = () => {
             <ArrowLeft className="mr-2 h-4 w-4" /> Back
           </Button>
           <h1 className="text-2xl font-bold text-white">{order.title}</h1>
-          <Badge className={getStatusColor(order.status)}>{order.status}</Badge>
+        </div>
+        
+        <div className="flex items-center space-x-3">
+          <Select
+            value={order.status}
+            onValueChange={handleUpdateOrderStatus}
+            disabled={isUpdatingOrderStatus}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue>
+                <div className="flex items-center space-x-2">
+                  <Badge className={getStatusColor(order.status)}>{order.status}</Badge>
+                </div>
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="processing">Processing</SelectItem>
+              <SelectItem value="shipping">Shipping</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -621,7 +677,7 @@ const AdminOrderDetail = () => {
                     supplier_id: null,
                     volume_m3: null,
                     status: 'pending',
-                    details: null,
+                    details: '',
                   });
                   setActiveSuborderDialog(true);
                 }}>
@@ -804,8 +860,8 @@ const AdminOrderDetail = () => {
                   setEditingItem(null);
                   trackingForm.reset({
                     status: 'pending',
-                    location: null,
-                    notes: null,
+                    location: '',
+                    notes: '',
                   });
                   setActiveTrackingDialog(true);
                 }}>
@@ -959,9 +1015,9 @@ const AdminOrderDetail = () => {
                     amount: 0,
                     currency: 'USD',
                     status: 'pending',
-                    payment_method: null,
+                    payment_method: '',
                     payment_date: null,
-                    notes: null,
+                    notes: '',
                   });
                   setActivePaymentDialog(true);
                 }}>

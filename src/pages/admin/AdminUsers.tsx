@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -26,6 +27,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Users, Search, MoreHorizontal, UserPlus, CheckCircle, XCircle, Shield } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/context/AuthContext';
 
 interface UserData {
   id: string;
@@ -41,6 +43,7 @@ const AdminUsers = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
 
   useEffect(() => {
     fetchUsers();
@@ -64,9 +67,6 @@ const AdminUsers = () => {
 
       if (rolesError) throw rolesError;
 
-      // Auth data will be handled differently since we can't directly access auth.users
-      // We'll use the emails we have access to
-      
       // Convert admin roles to a map for faster lookup
       const adminMap = new Map();
       rolesData.forEach(role => {
@@ -74,7 +74,6 @@ const AdminUsers = () => {
       });
 
       // Since we can't access auth data directly in the client, we'll use what we have
-      // This is a simplified approach
       const combinedUsers = usersData.map(user => ({
         ...user,
         email: `user-${user.id.substring(0, 8)}@example.com`, // Placeholder email
