@@ -25,8 +25,13 @@ import AdminLayout from "./pages/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminOrders from "./pages/admin/AdminOrders";
-import AdminOrderDetail from "./pages/admin/AdminOrderDetail"; // New import
+import AdminOrderDetail from "./pages/admin/AdminOrderDetail";
 import AdminSuppliers from "./pages/admin/AdminSuppliers";
+import AdminBlog from "./pages/admin/AdminBlog";
+
+// Blog pages
+import Blog from "./pages/Blog";
+import BlogPost from "./pages/BlogPost";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +45,8 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:slug" element={<BlogPost />} />
             
             {/* Protected User Dashboard Routes */}
             <Route path="/dashboard" element={
@@ -66,6 +73,7 @@ const App = () => (
               <Route path="orders" element={<AdminOrders />} />
               <Route path="orders/:id" element={<AdminOrderDetail />} />
               <Route path="suppliers" element={<AdminSuppliers />} />
+              <Route path="blog" element={<AdminBlog />} />
             </Route>
             
             {/* Catch-all route */}

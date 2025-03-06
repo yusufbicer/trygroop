@@ -61,6 +61,14 @@ const DashboardLayout = () => {
         <nav className="mt-4 px-3">
           <div className="space-y-1">
             <Link 
+              to="/" 
+              className="flex items-center px-3 py-2 text-white/80 hover:bg-white/5 rounded-md transition-colors"
+            >
+              <Home className="h-5 w-5 mr-3" />
+              {isSidebarOpen && <span>Home</span>}
+            </Link>
+            
+            <Link 
               to="/dashboard" 
               className="flex items-center px-3 py-2 text-white/80 hover:bg-white/5 rounded-md transition-colors"
             >
@@ -135,6 +143,15 @@ const DashboardLayout = () => {
       >
         <div className="py-4 px-3">
           <div className="space-y-1">
+            <Link 
+              to="/" 
+              className="flex items-center px-3 py-2 text-white/80 hover:bg-white/5 rounded-md transition-colors"
+              onClick={closeMobileMenu}
+            >
+              <Home className="h-5 w-5 mr-3" />
+              <span>Home</span>
+            </Link>
+            
             <Link 
               to="/dashboard" 
               className="flex items-center px-3 py-2 text-white/80 hover:bg-white/5 rounded-md transition-colors"

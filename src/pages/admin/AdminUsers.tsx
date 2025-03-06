@@ -52,14 +52,14 @@ const AdminUsers = () => {
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
-      // Fetch all users
-      const { data: usersData, error: usersError } = await supabase
+      // Step 1: Fetch all profiles
+      const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, created_at');
 
-      if (usersError) throw usersError;
+      if (profilesError) throw profilesError;
 
-      // Fetch admin roles
+      // Step 2: Fetch admin roles
       const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
         .select('user_id')
@@ -73,13 +73,16 @@ const AdminUsers = () => {
         adminMap.set(role.user_id, true);
       });
 
-      // Since we can't access auth data directly in the client, we'll use what we have
-      const combinedUsers = usersData.map(user => ({
-        ...user,
-        email: `user-${user.id.substring(0, 8)}@example.com`, // Placeholder email
-        isAdmin: adminMap.has(user.id)
+      // Step 3: Fetch auth.users data for emails
+      // Since we can't access auth data directly from client, we'll mock the emails
+      const combinedUsers = profilesData.map(profile => ({
+        ...profile,
+        email: `user-${profile.id.substring(0, 8)}@example.com`, // Placeholder email
+        isAdmin: adminMap.has(profile.id)
       }));
 
+      console.log("Fetched users:", combinedUsers);
+      
       setUsers(combinedUsers);
     } catch (error: any) {
       console.error('Error fetching users:', error);
@@ -100,6 +103,7 @@ const AdminUsers = () => {
   );
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
