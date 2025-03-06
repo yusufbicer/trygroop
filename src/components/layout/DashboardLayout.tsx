@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { useNavigate, Link, Outlet } from 'react-router-dom';
+import { useNavigate, Link, Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { 
   Package, 
@@ -11,8 +11,7 @@ import {
   ChevronDown, 
   Menu, 
   X,
-  Home,
-  ShieldCheck
+  Home
 } from 'lucide-react';
 
 const DashboardLayout = () => {
@@ -20,6 +19,11 @@ const DashboardLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
+
+  // Redirect admin users to admin panel
+  if (isAdmin) {
+    return <Navigate to="/admin" replace />;
+  }
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
@@ -79,16 +83,6 @@ const DashboardLayout = () => {
               <Truck className="h-5 w-5 mr-3" />
               {isSidebarOpen && <span>Suppliers</span>}
             </Link>
-            
-            {isAdmin && (
-              <Link 
-                to="/admin" 
-                className="flex items-center px-3 py-2 text-white/80 hover:bg-white/5 rounded-md transition-colors"
-              >
-                <ShieldCheck className="h-5 w-5 mr-3" />
-                {isSidebarOpen && <span>Admin Panel</span>}
-              </Link>
-            )}
           </div>
           
           <div className="mt-8 pt-4 border-t border-white/10">
@@ -167,17 +161,6 @@ const DashboardLayout = () => {
               <Truck className="h-5 w-5 mr-3" />
               <span>Suppliers</span>
             </Link>
-            
-            {isAdmin && (
-              <Link 
-                to="/admin" 
-                className="flex items-center px-3 py-2 text-white/80 hover:bg-white/5 rounded-md transition-colors"
-                onClick={closeMobileMenu}
-              >
-                <ShieldCheck className="h-5 w-5 mr-3" />
-                <span>Admin Panel</span>
-              </Link>
-            )}
           </div>
           
           <div className="mt-8 pt-4 border-t border-white/10">

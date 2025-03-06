@@ -1,29 +1,42 @@
+
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardHeader, 
+  CardTitle, 
+  CardFooter 
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useOrders } from '@/hooks/useOrders';
 import { useSuppliers } from '@/hooks/useSuppliers';
-import { useToast } from '@/hooks/use-toast';
-import { useOrderAttachments } from '@/hooks/useOrderAttachments';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Suborder, Tracking, Payment, OrderAttachment } from '@/types/data';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  CardFooter,
-} from '@/components/ui/card';
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import {
+import { Badge } from "@/components/ui/badge";
+import { 
+  Package, 
+  Truck, 
+  CreditCard, 
+  CheckCircle2, 
+  Paperclip, 
+  ArrowLeft,
+  Plus,
+  Save,
+  RefreshCcw
+} from 'lucide-react';
+import { 
   Dialog,
   DialogContent,
   DialogDescription,
@@ -31,80 +44,78 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Package,
-  Truck,
-  CreditCard,
-  FileText,
-  ArrowLeft,
-  Plus,
-  FilePlus,
-  Trash,
-  Edit,
-  Calendar,
-  MapPin,
-  DollarSign,
-  Save,
-} from 'lucide-react';
+} from "@/components/ui/dialog";
+import { Order, Tracking, Payment, Suborder } from '@/types/data';
 
 const AdminOrderDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const { fetchOrderWithDetails, createSuborder, updateSuborder, deleteSuborder, 
-         createTracking, updateTracking, deleteTracking, 
-         createPayment, updatePayment, deletePayment, updateOrder } = useOrders();
-  const { suppliers } = useSuppliers();
-  const { uploadAttachment, deleteAttachment, downloadAttachment } = useOrderAttachments();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [order, setOrder] = useState<any>(null);
+  const { fetchOrderWithDetails, updateOrder, createSuborder, createTracking, createPayment } = useOrders();
+  const { suppliers } = useSuppliers();
+  
+  const [order, setOrder] = useState<Order | null>(null);
+  const [orderDetails, setOrderDetails] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeSuborderDialog, setActiveSuborderDialog] = useState(false);
-  const [activeTrackingDialog, setActiveTrackingDialog] = useState(false);
-  const [activePaymentDialog, setActivePaymentDialog] = useState(false);
-  const [editingItem, setEditingItem] = useState<any>(null);
-  const [fileUploading, setFileUploading] = useState(false);
-  const [isUpdatingOrderStatus, setIsUpdatingOrderStatus] = useState(false);
-
-  const [activeTab, setActiveTab] = useState("details");
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Modals state
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [isSuborderModalOpen, setIsSuborderModalOpen] = useState(false);
+  const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  
+  // Form states
+  const [newStatus, setNewStatus] = useState('');
+  
+  const [newSuborder, setNewSuborder] = useState({
+    supplier_id: '',
+    status: 'pending',
+    volume_m3: '',
+    details: ''
+  });
+  
+  const [newTracking, setNewTracking] = useState({
+    status: 'pending',
+    location: '',
+    notes: ''
+  });
+  
+  const [newPayment, setNewPayment] = useState({
+    amount: '',
+    currency: 'USD',
+    status: 'pending',
+    payment_method: '',
+    payment_date: '',
+    notes: ''
+  });
 
   useEffect(() => {
-    if (id) {
-      loadOrderDetails();
-    }
+    loadOrderDetails();
   }, [id]);
 
   const loadOrderDetails = async () => {
+    if (!id) return;
+    
     setIsLoading(true);
     try {
-      const orderData = await fetchOrderWithDetails(id!);
-      setOrder(orderData);
+      const orderData = await fetchOrderWithDetails(id);
+      if (orderData) {
+        setOrder(orderData);
+        setOrderDetails(orderData);
+        setNewStatus(orderData.status);
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Order not found',
+          variant: 'destructive',
+        });
+        navigate('/admin/orders');
+      }
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: 'Failed to load order details',
+        description: error.message || 'Failed to load order details',
         variant: 'destructive',
       });
     } finally {
@@ -112,26 +123,23 @@ const AdminOrderDetail = () => {
     }
   };
 
-  const handleUpdateOrderStatus = async (newStatus: string) => {
-    if (!order || order.status === newStatus) return;
+  const handleStatusUpdate = async () => {
+    if (!id || !order) return;
     
-    setIsUpdatingOrderStatus(true);
+    setIsSaving(true);
     try {
       await updateOrder.mutateAsync({
-        id: order.id,
+        id,
         status: newStatus
       });
-      
-      // Update local state
-      setOrder(prev => ({
-        ...prev,
-        status: newStatus
-      }));
       
       toast({
-        title: 'Status Updated',
-        description: `Order status has been changed to ${newStatus}`,
+        title: 'Success',
+        description: 'Order status updated successfully',
       });
+      
+      setIsStatusModalOpen(false);
+      loadOrderDetails();
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -139,330 +147,129 @@ const AdminOrderDetail = () => {
         variant: 'destructive',
       });
     } finally {
-      setIsUpdatingOrderStatus(false);
+      setIsSaving(false);
     }
   };
 
-  const suborderSchema = z.object({
-    supplier_id: z.string().optional().nullable(),
-    volume_m3: z.number().min(0).optional().nullable(),
-    status: z.string(),
-    details: z.string().optional().nullable(),
-  });
-
-  const trackingSchema = z.object({
-    status: z.string(),
-    location: z.string().optional().nullable(),
-    notes: z.string().optional().nullable(),
-  });
-
-  const paymentSchema = z.object({
-    amount: z.number().min(0),
-    currency: z.string(),
-    status: z.string(),
-    payment_method: z.string().optional().nullable(),
-    payment_date: z.string().optional().nullable(),
-    notes: z.string().optional().nullable(),
-  });
-
-  const suborderForm = useForm<z.infer<typeof suborderSchema>>({
-    resolver: zodResolver(suborderSchema),
-    defaultValues: {
-      supplier_id: null,
-      volume_m3: null,
-      status: 'pending',
-      details: '',
-    },
-  });
-
-  const trackingForm = useForm<z.infer<typeof trackingSchema>>({
-    resolver: zodResolver(trackingSchema),
-    defaultValues: {
-      status: 'pending',
-      location: '',
-      notes: '',
-    },
-  });
-
-  const paymentForm = useForm<z.infer<typeof paymentSchema>>({
-    resolver: zodResolver(paymentSchema),
-    defaultValues: {
-      amount: 0,
-      currency: 'USD',
-      status: 'pending',
-      payment_method: '',
-      payment_date: null,
-      notes: '',
-    },
-  });
-
-  const onSubmitSuborder = async (values: z.infer<typeof suborderSchema>) => {
+  const handleAddSuborder = async () => {
+    if (!id) return;
+    
+    setIsSaving(true);
     try {
-      if (editingItem) {
-        await updateSuborder.mutateAsync({
-          id: editingItem.id,
-          ...values,
-          volume_m3: values.volume_m3 || null,
-        });
-        toast({
-          title: 'Success',
-          description: 'Suborder updated successfully',
-        });
-      } else {
-        await createSuborder.mutateAsync({
-          order_id: id!,
-          status: values.status,
-          details: values.details || '',
-          supplier_id: values.supplier_id || null,
-          volume_m3: values.volume_m3 || null,
-        });
-        toast({
-          title: 'Success',
-          description: 'Suborder created successfully',
-        });
-      }
-      setActiveSuborderDialog(false);
-      setEditingItem(null);
-      suborderForm.reset();
-      loadOrderDetails();
-    } catch (error: any) {
-      console.error("Error saving suborder:", error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to save suborder',
-        variant: 'destructive',
+      const volume = newSuborder.volume_m3 ? parseFloat(newSuborder.volume_m3) : null;
+      
+      await createSuborder.mutateAsync({
+        order_id: id,
+        supplier_id: newSuborder.supplier_id || null,
+        status: newSuborder.status,
+        volume_m3: volume,
+        details: newSuborder.details || ''
       });
-    }
-  };
-
-  const onSubmitTracking = async (values: z.infer<typeof trackingSchema>) => {
-    try {
-      if (editingItem) {
-        await updateTracking.mutateAsync({
-          id: editingItem.id,
-          ...values,
-        });
-        toast({
-          title: 'Success',
-          description: 'Tracking updated successfully',
-        });
-      } else {
-        await createTracking.mutateAsync({
-          order_id: id!,
-          status: values.status,
-          location: values.location || '',
-          notes: values.notes || '',
-        });
-        toast({
-          title: 'Success',
-          description: 'Tracking created successfully',
-        });
-      }
-      setActiveTrackingDialog(false);
-      setEditingItem(null);
-      trackingForm.reset();
-      loadOrderDetails();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to save tracking',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const onSubmitPayment = async (values: z.infer<typeof paymentSchema>) => {
-    try {
-      if (editingItem) {
-        await updatePayment.mutateAsync({
-          id: editingItem.id,
-          ...values,
-        });
-        toast({
-          title: 'Success',
-          description: 'Payment updated successfully',
-        });
-      } else {
-        await createPayment.mutateAsync({
-          order_id: id!,
-          amount: values.amount,
-          currency: values.currency,
-          status: values.status,
-          payment_method: values.payment_method || '',
-          payment_date: values.payment_date || null,
-          notes: values.notes || '',
-        });
-        toast({
-          title: 'Success',
-          description: 'Payment created successfully',
-        });
-      }
-      setActivePaymentDialog(false);
-      setEditingItem(null);
-      paymentForm.reset();
-      loadOrderDetails();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to save payment',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleDeleteSuborder = async (id: string) => {
-    try {
-      await deleteSuborder.mutateAsync(id);
+      
       toast({
         title: 'Success',
-        description: 'Suborder deleted successfully',
+        description: 'Suborder added successfully',
+      });
+      
+      setIsSuborderModalOpen(false);
+      setNewSuborder({
+        supplier_id: '',
+        status: 'pending',
+        volume_m3: '',
+        details: ''
       });
       loadOrderDetails();
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete suborder',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleDeleteTracking = async (id: string) => {
-    try {
-      await deleteTracking.mutateAsync(id);
-      toast({
-        title: 'Success',
-        description: 'Tracking deleted successfully',
-      });
-      loadOrderDetails();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to delete tracking',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleDeletePayment = async (id: string) => {
-    try {
-      await deletePayment.mutateAsync(id);
-      toast({
-        title: 'Success',
-        description: 'Payment deleted successfully',
-      });
-      loadOrderDetails();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to delete payment',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    
-    const file = files[0];
-    
-    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
-                          'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
-    
-    if (!allowedTypes.includes(file.type)) {
-      toast({
-        title: 'Invalid file type',
-        description: 'Only PDF, DOC, DOCX, XLS, and XLSX files are allowed',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    setFileUploading(true);
-    try {
-      await uploadAttachment(id!, file);
-      toast({
-        title: 'Success',
-        description: 'File uploaded successfully',
-      });
-      loadOrderDetails();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to upload file',
+        description: error.message || 'Failed to add suborder',
         variant: 'destructive',
       });
     } finally {
-      setFileUploading(false);
+      setIsSaving(false);
     }
   };
 
-  const handleDownloadFile = async (attachment: OrderAttachment) => {
+  const handleAddTracking = async () => {
+    if (!id) return;
+    
+    setIsSaving(true);
     try {
-      await downloadAttachment(attachment);
+      await createTracking.mutateAsync({
+        order_id: id,
+        status: newTracking.status,
+        location: newTracking.location || '',
+        notes: newTracking.notes || ''
+      });
+      
       toast({
         title: 'Success',
-        description: 'File download started',
+        description: 'Tracking information added successfully',
       });
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to download file',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleDeleteFile = async (attachment: OrderAttachment) => {
-    try {
-      await deleteAttachment(attachment);
-      toast({
-        title: 'Success',
-        description: 'File deleted successfully',
+      
+      setIsTrackingModalOpen(false);
+      setNewTracking({
+        status: 'pending',
+        location: '',
+        notes: ''
       });
       loadOrderDetails();
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete file',
+        description: error.message || 'Failed to add tracking information',
         variant: 'destructive',
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleEditSuborder = (suborder: Suborder) => {
-    setEditingItem(suborder);
-    suborderForm.reset({
-      supplier_id: suborder.supplier_id,
-      volume_m3: suborder.volume_m3 || null,
-      status: suborder.status,
-      details: suborder.details || '',
-    });
-    setActiveSuborderDialog(true);
-  };
-
-  const handleEditTracking = (tracking: Tracking) => {
-    setEditingItem(tracking);
-    trackingForm.reset({
-      status: tracking.status,
-      location: tracking.location || '',
-      notes: tracking.notes || '',
-    });
-    setActiveTrackingDialog(true);
-  };
-
-  const handleEditPayment = (payment: Payment) => {
-    setEditingItem(payment);
-    paymentForm.reset({
-      amount: payment.amount,
-      currency: payment.currency,
-      status: payment.status,
-      payment_method: payment.payment_method || '',
-      payment_date: payment.payment_date ? new Date(payment.payment_date).toISOString().split('T')[0] : null,
-      notes: payment.notes || '',
-    });
-    setActivePaymentDialog(true);
+  const handleAddPayment = async () => {
+    if (!id) return;
+    
+    setIsSaving(true);
+    try {
+      const amount = parseFloat(newPayment.amount);
+      
+      if (isNaN(amount) || amount <= 0) {
+        throw new Error('Please enter a valid payment amount');
+      }
+      
+      await createPayment.mutateAsync({
+        order_id: id,
+        amount,
+        currency: newPayment.currency,
+        status: newPayment.status,
+        payment_method: newPayment.payment_method || '',
+        payment_date: newPayment.payment_date ? new Date(newPayment.payment_date).toISOString() : null,
+        notes: newPayment.notes || ''
+      });
+      
+      toast({
+        title: 'Success',
+        description: 'Payment information added successfully',
+      });
+      
+      setIsPaymentModalOpen(false);
+      setNewPayment({
+        amount: '',
+        currency: 'USD',
+        status: 'pending',
+        payment_method: '',
+        payment_date: '',
+        notes: ''
+      });
+      loadOrderDetails();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to add payment information',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -474,753 +281,612 @@ const AdminOrderDetail = () => {
     }).format(date);
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColorClass = (status: string) => {
     switch (status.toLowerCase()) {
       case 'completed':
-        return 'bg-green-500/10 text-green-500 hover:bg-green-500/20';
+        return 'bg-green-500/20 text-green-500';
       case 'processing':
-        return 'bg-blue-500/10 text-blue-500 hover:bg-blue-500/20';
+        return 'bg-blue-500/20 text-blue-500';
       case 'shipping':
-        return 'bg-purple-500/10 text-purple-500 hover:bg-purple-500/20';
+        return 'bg-purple-500/20 text-purple-500';
       case 'pending':
       default:
-        return 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20';
+        return 'bg-yellow-500/20 text-yellow-500';
     }
   };
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-12">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-groop-blue"></div>
       </div>
     );
   }
 
-  if (!order) {
+  if (!order || !orderDetails) {
     return (
-      <div className="text-center py-12">
-        <h2 className="text-xl font-bold text-white mb-2">Order not found</h2>
-        <p className="text-white/70 mb-4">The order you're looking for doesn't exist or you don't have permission to view it.</p>
-        <Button variant="outline" onClick={() => navigate('/admin/orders')}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Orders
-        </Button>
+      <div className="container mx-auto py-6 space-y-6">
+        <div className="text-center py-12">
+          <h2 className="text-2xl font-bold mb-2">Order Not Found</h2>
+          <p className="text-gray-500 mb-6">The order you are looking for does not exist or you do not have permission to view it.</p>
+          <Button onClick={() => navigate('/admin/orders')}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Orders
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm" onClick={() => navigate('/admin/orders')}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+    <div className="container mx-auto py-6 space-y-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center">
+          <Button variant="ghost" onClick={() => navigate('/admin/orders')} className="mr-4">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
           </Button>
-          <h1 className="text-2xl font-bold text-white">{order.title}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Order Details</h1>
         </div>
-        
-        <div className="flex items-center space-x-3">
-          <Select
-            value={order.status}
-            onValueChange={handleUpdateOrderStatus}
-            disabled={isUpdatingOrderStatus}
+        <div className="flex space-x-2">
+          <Button 
+            variant="outline" 
+            onClick={() => loadOrderDetails()}
           >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue>
-                <div className="flex items-center space-x-2">
-                  <Badge className={getStatusColor(order.status)}>{order.status}</Badge>
-                </div>
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="processing">Processing</SelectItem>
-              <SelectItem value="shipping">Shipping</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
+            <RefreshCcw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          <Dialog open={isStatusModalOpen} onOpenChange={setIsStatusModalOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Save className="h-4 w-4 mr-2" />
+                Update Status
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Update Order Status</DialogTitle>
+                <DialogDescription>
+                  Update the status of this order to reflect its current state.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                <Select value={newStatus} onValueChange={setNewStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="processing">Processing</SelectItem>
+                    <SelectItem value="shipping">Shipping</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsStatusModalOpen(false)}>Cancel</Button>
+                <Button onClick={handleStatusUpdate} disabled={isSaving}>
+                  {isSaving ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-4 mb-6">
-          <TabsTrigger value="details" className="flex items-center">
-            <Package className="mr-2 h-4 w-4" /> Details
-          </TabsTrigger>
-          <TabsTrigger value="suborders" className="flex items-center">
-            <Truck className="mr-2 h-4 w-4" /> Suborders
-          </TabsTrigger>
-          <TabsTrigger value="tracking" className="flex items-center">
-            <MapPin className="mr-2 h-4 w-4" /> Tracking
-          </TabsTrigger>
-          <TabsTrigger value="payments" className="flex items-center">
-            <CreditCard className="mr-2 h-4 w-4" /> Payments
-          </TabsTrigger>
-        </TabsList>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>{order.title}</CardTitle>
+                <CardDescription>
+                  Created on {formatDate(order.created_at)}
+                </CardDescription>
+              </div>
+              <Badge className={getStatusColorClass(order.status)}>
+                {order.status}
+              </Badge>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="details">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="details">Details</TabsTrigger>
+                  <TabsTrigger value="suborders">Suborders</TabsTrigger>
+                  <TabsTrigger value="tracking">Tracking</TabsTrigger>
+                  <TabsTrigger value="payments">Payments</TabsTrigger>
+                </TabsList>
 
-        <TabsContent value="details" className="space-y-6">
-          <Card className="glass">
+                <TabsContent value="details">
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-medium mb-2">Order Information</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <p className="text-sm text-gray-500">Status</p>
+                          <p className="font-medium">{order.status}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm text-gray-500">Order Date</p>
+                          <p className="font-medium">{formatDate(order.created_at)}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm text-gray-500">Customer</p>
+                          <p className="font-medium">
+                            {orderDetails.profile?.first_name || orderDetails.profile?.last_name ? 
+                              `${orderDetails.profile?.first_name || ''} ${orderDetails.profile?.last_name || ''}` : 
+                              'No name'}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm text-gray-500">Customer ID</p>
+                          <p className="font-medium">{order.user_id}</p>
+                        </div>
+                        {order.total_volume && (
+                          <div className="space-y-1">
+                            <p className="text-sm text-gray-500">Total Volume</p>
+                            <p className="font-medium">{order.total_volume} m³</p>
+                          </div>
+                        )}
+                        <div className="space-y-1">
+                          <p className="text-sm text-gray-500">Last Updated</p>
+                          <p className="font-medium">{formatDate(order.updated_at)}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {order.details && (
+                      <div>
+                        <h3 className="text-lg font-medium mb-2">Details</h3>
+                        <p className="text-gray-700">{order.details}</p>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="suborders">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-medium">Suborders</h3>
+                    <Dialog open={isSuborderModalOpen} onOpenChange={setIsSuborderModalOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Suborder
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Add Suborder</DialogTitle>
+                          <DialogDescription>
+                            Create a new suborder for this order.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4 space-y-4">
+                          <div className="space-y-2">
+                            <label htmlFor="supplier" className="text-sm font-medium">Supplier</label>
+                            <Select value={newSuborder.supplier_id} onValueChange={(value) => setNewSuborder({...newSuborder, supplier_id: value})}>
+                              <SelectTrigger id="supplier">
+                                <SelectValue placeholder="Select supplier" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {suppliers.map((supplier) => (
+                                  <SelectItem key={supplier.id} value={supplier.id}>
+                                    {supplier.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <label htmlFor="suborder-status" className="text-sm font-medium">Status</label>
+                            <Select value={newSuborder.status} onValueChange={(value) => setNewSuborder({...newSuborder, status: value})}>
+                              <SelectTrigger id="suborder-status">
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="processing">Processing</SelectItem>
+                                <SelectItem value="shipping">Shipping</SelectItem>
+                                <SelectItem value="completed">Completed</SelectItem>
+                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <label htmlFor="volume" className="text-sm font-medium">Volume (m³)</label>
+                            <Input
+                              id="volume"
+                              type="number"
+                              placeholder="Enter volume"
+                              value={newSuborder.volume_m3}
+                              onChange={(e) => setNewSuborder({...newSuborder, volume_m3: e.target.value})}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label htmlFor="suborder-details" className="text-sm font-medium">Details</label>
+                            <Textarea
+                              id="suborder-details"
+                              placeholder="Enter details about this suborder"
+                              value={newSuborder.details}
+                              onChange={(e) => setNewSuborder({...newSuborder, details: e.target.value})}
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setIsSuborderModalOpen(false)}>Cancel</Button>
+                          <Button onClick={handleAddSuborder} disabled={isSaving}>
+                            {isSaving ? 'Adding...' : 'Add Suborder'}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                  
+                  {orderDetails.suborders?.length === 0 ? (
+                    <div className="py-6 text-center">
+                      <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                      <h3 className="text-lg font-medium mb-1">No Suborders</h3>
+                      <p className="text-gray-500">This order doesn't have any suborders yet.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {orderDetails.suborders?.map((suborder: any) => (
+                        <Card key={suborder.id}>
+                          <CardContent className="pt-6">
+                            <div className="flex justify-between items-start mb-4">
+                              <div>
+                                <h3 className="font-medium">
+                                  {suborder.suppliers ? suborder.suppliers.name : 'No Supplier'}
+                                </h3>
+                                <Badge className={`mt-1 ${getStatusColorClass(suborder.status)}`}>
+                                  {suborder.status}
+                                </Badge>
+                              </div>
+                              {suborder.volume_m3 && (
+                                <div className="text-right">
+                                  <span className="text-sm text-gray-500">Volume</span>
+                                  <p className="font-medium">{suborder.volume_m3} m³</p>
+                                </div>
+                              )}
+                            </div>
+                            {suborder.details && (
+                              <div className="mt-4">
+                                <p className="text-sm text-gray-500 mb-1">Details</p>
+                                <p className="text-gray-700">{suborder.details}</p>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="tracking">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-medium">Tracking Information</h3>
+                    <Dialog open={isTrackingModalOpen} onOpenChange={setIsTrackingModalOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Tracking
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Add Tracking Information</DialogTitle>
+                          <DialogDescription>
+                            Add tracking details for this order.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4 space-y-4">
+                          <div className="space-y-2">
+                            <label htmlFor="tracking-status" className="text-sm font-medium">Status</label>
+                            <Select value={newTracking.status} onValueChange={(value) => setNewTracking({...newTracking, status: value})}>
+                              <SelectTrigger id="tracking-status">
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="processing">Processing</SelectItem>
+                                <SelectItem value="shipped">Shipped</SelectItem>
+                                <SelectItem value="in transit">In Transit</SelectItem>
+                                <SelectItem value="delivered">Delivered</SelectItem>
+                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <label htmlFor="location" className="text-sm font-medium">Location</label>
+                            <Input
+                              id="location"
+                              placeholder="Enter location"
+                              value={newTracking.location}
+                              onChange={(e) => setNewTracking({...newTracking, location: e.target.value})}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label htmlFor="tracking-notes" className="text-sm font-medium">Notes</label>
+                            <Textarea
+                              id="tracking-notes"
+                              placeholder="Enter tracking notes"
+                              value={newTracking.notes}
+                              onChange={(e) => setNewTracking({...newTracking, notes: e.target.value})}
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setIsTrackingModalOpen(false)}>Cancel</Button>
+                          <Button onClick={handleAddTracking} disabled={isSaving}>
+                            {isSaving ? 'Adding...' : 'Add Tracking'}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                  
+                  {orderDetails.tracking?.length === 0 ? (
+                    <div className="py-6 text-center">
+                      <Truck className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                      <h3 className="text-lg font-medium mb-1">No Tracking Information</h3>
+                      <p className="text-gray-500">This order doesn't have any tracking updates yet.</p>
+                    </div>
+                  ) : (
+                    <div className="relative space-y-0">
+                      <div className="absolute left-5 top-6 bottom-6 w-[2px] bg-gray-200"></div>
+                      
+                      {orderDetails.tracking?.map((tracking: any, index: number) => (
+                        <div key={tracking.id} className="relative pl-14 py-4">
+                          <div className={`absolute left-4 top-5 h-4 w-4 rounded-full border-2 
+                            ${index === 0 ? 'bg-green-500 border-green-500' : 'bg-white border-gray-300'}`}
+                          ></div>
+                          
+                          <div>
+                            <div className="flex items-center">
+                              <h3 className="font-medium text-lg">{tracking.status}</h3>
+                              {tracking.location && (
+                                <span className="text-gray-500 ml-2">at {tracking.location}</span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-500">{formatDate(tracking.created_at)}</p>
+                            {tracking.notes && (
+                              <p className="mt-2 text-gray-700">{tracking.notes}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="payments">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-medium">Payment Information</h3>
+                    <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Payment
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Add Payment Information</DialogTitle>
+                          <DialogDescription>
+                            Record a payment for this order.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4 space-y-4">
+                          <div className="space-y-2">
+                            <label htmlFor="amount" className="text-sm font-medium">Amount</label>
+                            <Input
+                              id="amount"
+                              type="number"
+                              placeholder="Enter amount"
+                              value={newPayment.amount}
+                              onChange={(e) => setNewPayment({...newPayment, amount: e.target.value})}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label htmlFor="currency" className="text-sm font-medium">Currency</label>
+                            <Select value={newPayment.currency} onValueChange={(value) => setNewPayment({...newPayment, currency: value})}>
+                              <SelectTrigger id="currency">
+                                <SelectValue placeholder="Select currency" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="USD">USD</SelectItem>
+                                <SelectItem value="EUR">EUR</SelectItem>
+                                <SelectItem value="GBP">GBP</SelectItem>
+                                <SelectItem value="CAD">CAD</SelectItem>
+                                <SelectItem value="AUD">AUD</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <label htmlFor="payment-status" className="text-sm font-medium">Status</label>
+                            <Select value={newPayment.status} onValueChange={(value) => setNewPayment({...newPayment, status: value})}>
+                              <SelectTrigger id="payment-status">
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="processing">Processing</SelectItem>
+                                <SelectItem value="completed">Completed</SelectItem>
+                                <SelectItem value="failed">Failed</SelectItem>
+                                <SelectItem value="refunded">Refunded</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <label htmlFor="payment-method" className="text-sm font-medium">Payment Method</label>
+                            <Input
+                              id="payment-method"
+                              placeholder="Enter payment method"
+                              value={newPayment.payment_method}
+                              onChange={(e) => setNewPayment({...newPayment, payment_method: e.target.value})}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label htmlFor="payment-date" className="text-sm font-medium">Payment Date</label>
+                            <Input
+                              id="payment-date"
+                              type="date"
+                              value={newPayment.payment_date}
+                              onChange={(e) => setNewPayment({...newPayment, payment_date: e.target.value})}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label htmlFor="payment-notes" className="text-sm font-medium">Notes</label>
+                            <Textarea
+                              id="payment-notes"
+                              placeholder="Enter payment notes"
+                              value={newPayment.notes}
+                              onChange={(e) => setNewPayment({...newPayment, notes: e.target.value})}
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setIsPaymentModalOpen(false)}>Cancel</Button>
+                          <Button onClick={handleAddPayment} disabled={isSaving}>
+                            {isSaving ? 'Adding...' : 'Add Payment'}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                  
+                  {orderDetails.payments?.length === 0 ? (
+                    <div className="py-6 text-center">
+                      <CreditCard className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                      <h3 className="text-lg font-medium mb-1">No Payment Information</h3>
+                      <p className="text-gray-500">This order doesn't have any payment information yet.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {orderDetails.payments?.map((payment: any) => (
+                        <Card key={payment.id}>
+                          <CardContent className="pt-6">
+                            <div className="flex justify-between items-start mb-4">
+                              <div>
+                                <h3 className="font-medium text-lg">
+                                  {payment.amount} {payment.currency}
+                                </h3>
+                                <Badge className={getStatusColorClass(payment.status)}>
+                                  {payment.status}
+                                </Badge>
+                              </div>
+                              
+                              {payment.payment_date && (
+                                <div className="text-right">
+                                  <span className="text-sm text-gray-500">Payment Date</span>
+                                  <p className="font-medium">{formatDate(payment.payment_date)}</p>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {payment.payment_method && (
+                              <div className="mb-2">
+                                <p className="text-sm text-gray-500">Method</p>
+                                <p className="font-medium">{payment.payment_method}</p>
+                              </div>
+                            )}
+                            
+                            {payment.notes && (
+                              <div className="mt-4">
+                                <p className="text-sm text-gray-500 mb-1">Notes</p>
+                                <p className="text-gray-700">{payment.notes}</p>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card>
             <CardHeader>
-              <CardTitle>Order Information</CardTitle>
-              <CardDescription>Basic details about this order</CardDescription>
+              <CardTitle>Order Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <div className="text-sm text-gray-500">Status</div>
+                  <div className="flex items-center mt-1">
+                    <Badge className={getStatusColorClass(order.status)}>
+                      {order.status}
+                    </Badge>
+                  </div>
+                </div>
+                <Separator />
+                <div>
+                  <div className="text-sm text-gray-500">Customer</div>
+                  <div className="font-medium mt-1">
+                    {orderDetails.profile?.first_name || orderDetails.profile?.last_name ? 
+                      `${orderDetails.profile?.first_name || ''} ${orderDetails.profile?.last_name || ''}` : 
+                      'No name'}
+                  </div>
+                </div>
+                <Separator />
+                <div>
+                  <div className="text-sm text-gray-500">Order Date</div>
+                  <div className="font-medium mt-1">
+                    {formatDate(order.created_at)}
+                  </div>
+                </div>
+                <Separator />
+                <div>
+                  <div className="text-sm text-gray-500">Suborders</div>
+                  <div className="font-medium mt-1">
+                    {orderDetails.suborders?.length || 0}
+                  </div>
+                </div>
+                {order.total_volume && (
+                  <>
+                    <Separator />
+                    <div>
+                      <div className="text-sm text-gray-500">Total Volume</div>
+                      <div className="font-medium mt-1">
+                        {order.total_volume} m³
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h3 className="text-sm font-medium text-white/70">Order ID</h3>
-                  <p className="text-white">{order.id}</p>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-white/70">Created</h3>
-                  <p className="text-white">{formatDate(order.created_at)}</p>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-white/70">User</h3>
-                  <p className="text-white">
-                    {order.profile?.first_name || ''} {order.profile?.last_name || ''}
-                    <span className="ml-2 text-white/50">({order.user_id})</span>
-                  </p>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-white/70">Total Volume</h3>
-                  <p className="text-white">{order.total_volume ? `${order.total_volume} m³` : 'Not specified'}</p>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-medium text-white/70">Details</h3>
-                <p className="text-white">{order.details || 'No details provided'}</p>
-              </div>
+              <Button className="w-full" onClick={() => setIsStatusModalOpen(true)}>
+                <RefreshCcw className="mr-2 h-4 w-4" />
+                Update Status
+              </Button>
+              <Button className="w-full" onClick={() => setIsSuborderModalOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Suborder
+              </Button>
+              <Button className="w-full" onClick={() => setIsTrackingModalOpen(true)}>
+                <Truck className="mr-2 h-4 w-4" />
+                Add Tracking
+              </Button>
+              <Button className="w-full" onClick={() => setIsPaymentModalOpen(true)}>
+                <CreditCard className="mr-2 h-4 w-4" />
+                Add Payment
+              </Button>
             </CardContent>
           </Card>
-
-          <Card className="glass">
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle>Attachments</CardTitle>
-                  <CardDescription>Documents related to this order</CardDescription>
-                </div>
-                <div>
-                  <Button size="sm" className="relative">
-                    <FilePlus className="mr-2 h-4 w-4" /> Upload Document
-                    <input 
-                      type="file" 
-                      className="absolute inset-0 opacity-0 cursor-pointer" 
-                      onChange={handleFileUpload}
-                      accept=".pdf,.doc,.docx,.xls,.xlsx"
-                      disabled={fileUploading}
-                    />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {order.attachments && order.attachments.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>File Name</TableHead>
-                      <TableHead>File Type</TableHead>
-                      <TableHead>Uploaded</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {order.attachments.map((attachment: OrderAttachment) => (
-                      <TableRow key={attachment.id}>
-                        <TableCell className="font-medium">{attachment.file_name}</TableCell>
-                        <TableCell>{attachment.file_type}</TableCell>
-                        <TableCell>{formatDate(attachment.created_at)}</TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDownloadFile(attachment)}
-                            className="mr-2"
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteFile(attachment)}
-                          >
-                            <Trash className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-6 text-white/50">
-                  <FileText className="mx-auto h-8 w-8 mb-2" />
-                  <p>No attachments yet</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="suborders" className="space-y-6">
-          <Card className="glass">
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle>Suborders</CardTitle>
-                  <CardDescription>Manage shipments from suppliers</CardDescription>
-                </div>
-                <Button onClick={() => {
-                  setEditingItem(null);
-                  suborderForm.reset({
-                    supplier_id: null,
-                    volume_m3: null,
-                    status: 'pending',
-                    details: '',
-                  });
-                  setActiveSuborderDialog(true);
-                }}>
-                  <Plus className="mr-2 h-4 w-4" /> Add Suborder
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {order.suborders && order.suborders.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Supplier</TableHead>
-                      <TableHead>Volume</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {order.suborders.map((suborder: Suborder) => (
-                      <TableRow key={suborder.id}>
-                        <TableCell>{suborder.suppliers?.name || 'No supplier'}</TableCell>
-                        <TableCell>{suborder.volume_m3 ? `${suborder.volume_m3} m³` : '-'}</TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(suborder.status)}>{suborder.status}</Badge>
-                        </TableCell>
-                        <TableCell>{formatDate(suborder.created_at)}</TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditSuborder(suborder)}
-                            className="mr-2"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteSuborder(suborder.id)}
-                          >
-                            <Trash className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-6 text-white/50">
-                  <Truck className="mx-auto h-8 w-8 mb-2" />
-                  <p>No suborders yet</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Dialog open={activeSuborderDialog} onOpenChange={setActiveSuborderDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editingItem ? 'Edit Suborder' : 'Add Suborder'}</DialogTitle>
-                <DialogDescription>
-                  {editingItem ? 'Update the suborder details' : 'Create a new shipment from a supplier'}
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...suborderForm}>
-                <form onSubmit={suborderForm.handleSubmit(onSubmitSuborder)} className="space-y-4">
-                  <FormField
-                    control={suborderForm.control}
-                    name="supplier_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Supplier</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value || undefined}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a supplier" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="">No supplier</SelectItem>
-                            {suppliers?.map((supplier) => (
-                              <SelectItem key={supplier.id} value={supplier.id}>
-                                {supplier.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={suborderForm.control}
-                    name="volume_m3"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Volume (m³)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            placeholder="Enter volume"
-                            value={field.value === null ? '' : field.value}
-                            onChange={(e) => {
-                              const value = e.target.value === '' ? null : parseFloat(e.target.value);
-                              field.onChange(value);
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={suborderForm.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Status</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="processing">Processing</SelectItem>
-                            <SelectItem value="shipping">Shipping</SelectItem>
-                            <SelectItem value="completed">Completed</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={suborderForm.control}
-                    name="details"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Details</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Enter any additional details"
-                            {...field}
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <DialogFooter>
-                    <Button type="submit">{editingItem ? 'Update' : 'Create'}</Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        </TabsContent>
-
-        <TabsContent value="tracking" className="space-y-6">
-          <Card className="glass">
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle>Tracking History</CardTitle>
-                  <CardDescription>Shipment tracking updates</CardDescription>
-                </div>
-                <Button onClick={() => {
-                  setEditingItem(null);
-                  trackingForm.reset({
-                    status: 'pending',
-                    location: '',
-                    notes: '',
-                  });
-                  setActiveTrackingDialog(true);
-                }}>
-                  <Plus className="mr-2 h-4 w-4" /> Add Tracking
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {order.tracking && order.tracking.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Notes</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {order.tracking.map((item: Tracking) => (
-                      <TableRow key={item.id}>
-                        <TableCell>
-                          <Badge className={getStatusColor(item.status)}>{item.status}</Badge>
-                        </TableCell>
-                        <TableCell>{item.location || '-'}</TableCell>
-                        <TableCell>{formatDate(item.created_at)}</TableCell>
-                        <TableCell className="max-w-[200px] truncate">{item.notes || '-'}</TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditTracking(item)}
-                            className="mr-2"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteTracking(item.id)}
-                          >
-                            <Trash className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-6 text-white/50">
-                  <MapPin className="mx-auto h-8 w-8 mb-2" />
-                  <p>No tracking information yet</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Dialog open={activeTrackingDialog} onOpenChange={setActiveTrackingDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editingItem ? 'Edit Tracking' : 'Add Tracking'}</DialogTitle>
-                <DialogDescription>
-                  {editingItem ? 'Update the tracking information' : 'Add a new tracking update'}
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...trackingForm}>
-                <form onSubmit={trackingForm.handleSubmit(onSubmitTracking)} className="space-y-4">
-                  <FormField
-                    control={trackingForm.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Status</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="processing">Processing</SelectItem>
-                            <SelectItem value="in_transit">In Transit</SelectItem>
-                            <SelectItem value="customs">Customs</SelectItem>
-                            <SelectItem value="delivered">Delivered</SelectItem>
-                            <SelectItem value="completed">Completed</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={trackingForm.control}
-                    name="location"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Location</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Enter location"
-                            {...field}
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={trackingForm.control}
-                    name="notes"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Notes</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Enter any additional notes"
-                            {...field}
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <DialogFooter>
-                    <Button type="submit">{editingItem ? 'Update' : 'Create'}</Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        </TabsContent>
-
-        <TabsContent value="payments" className="space-y-6">
-          <Card className="glass">
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle>Payment History</CardTitle>
-                  <CardDescription>Payment records for this order</CardDescription>
-                </div>
-                <Button onClick={() => {
-                  setEditingItem(null);
-                  paymentForm.reset({
-                    amount: 0,
-                    currency: 'USD',
-                    status: 'pending',
-                    payment_method: '',
-                    payment_date: null,
-                    notes: '',
-                  });
-                  setActivePaymentDialog(true);
-                }}>
-                  <Plus className="mr-2 h-4 w-4" /> Add Payment
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {order.payments && order.payments.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Method</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {order.payments.map((payment: Payment) => (
-                      <TableRow key={payment.id}>
-                        <TableCell>
-                          {payment.amount} {payment.currency}
-                        </TableCell>
-                        <TableCell>{payment.payment_method || '-'}</TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(payment.status)}>{payment.status}</Badge>
-                        </TableCell>
-                        <TableCell>{payment.payment_date ? formatDate(payment.payment_date) : formatDate(payment.created_at)}</TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditPayment(payment)}
-                            className="mr-2"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeletePayment(payment.id)}
-                          >
-                            <Trash className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-6 text-white/50">
-                  <DollarSign className="mx-auto h-8 w-8 mb-2" />
-                  <p>No payment records yet</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Dialog open={activePaymentDialog} onOpenChange={setActivePaymentDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editingItem ? 'Edit Payment' : 'Add Payment'}</DialogTitle>
-                <DialogDescription>
-                  {editingItem ? 'Update the payment details' : 'Record a new payment for this order'}
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...paymentForm}>
-                <form onSubmit={paymentForm.handleSubmit(onSubmitPayment)} className="space-y-4">
-                  <FormField
-                    control={paymentForm.control}
-                    name="amount"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Amount</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            placeholder="Enter amount"
-                            {...field}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={paymentForm.control}
-                    name="currency"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Currency</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select currency" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="USD">USD</SelectItem>
-                            <SelectItem value="EUR">EUR</SelectItem>
-                            <SelectItem value="GBP">GBP</SelectItem>
-                            <SelectItem value="CAD">CAD</SelectItem>
-                            <SelectItem value="AUD">AUD</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={paymentForm.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Status</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="processing">Processing</SelectItem>
-                            <SelectItem value="completed">Completed</SelectItem>
-                            <SelectItem value="failed">Failed</SelectItem>
-                            <SelectItem value="refunded">Refunded</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={paymentForm.control}
-                    name="payment_method"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Payment Method</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="e.g. Credit Card, Bank Transfer"
-                            {...field}
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={paymentForm.control}
-                    name="payment_date"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Payment Date</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="date"
-                            {...field}
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={paymentForm.control}
-                    name="notes"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Notes</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Enter any additional notes"
-                            {...field}
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <DialogFooter>
-                    <Button type="submit">{editingItem ? 'Update' : 'Create'}</Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
     </div>
   );
 };
