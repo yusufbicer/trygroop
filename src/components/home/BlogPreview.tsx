@@ -1,40 +1,63 @@
 
+import { useState, useEffect } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
 import { CustomCard, CustomCardHeader, CustomCardContent, CustomCardFooter } from '../ui/CustomCard';
 import { CustomButton } from '../ui/CustomButton';
+import { BlogPost, CustomSupabaseClient } from '@/types/blog';
 
-const blogPosts = [
-  {
-    id: 1,
-    title: 'Optimizing Container Space: How Consolidation Saves Money',
-    excerpt: 'Learn how properly consolidated shipments can reduce your shipping costs by up to 40% while ensuring timely delivery.',
-    author: 'Murat Kaya',
-    date: 'Aug 15, 2023',
-    category: 'Shipping',
-    readTime: '5 min read',
-  },
-  {
-    id: 2,
-    title: 'The Complete Guide to Turkish Import Documentation',
-    excerpt: 'Navigate the complex world of Turkish export documentation with our comprehensive guide for international importers.',
-    author: 'Ayşe Demir',
-    date: 'Jul 28, 2023',
-    category: 'Documentation',
-    readTime: '8 min read',
-  },
-  {
-    id: 3,
-    title: 'Streamlining Payments for Multiple Turkish Suppliers',
-    excerpt: 'Discover how payment consolidation can simplify your accounting, reduce transaction fees, and improve supplier relationships.',
-    author: 'Kerem Yılmaz',
-    date: 'Jun 12, 2023',
-    category: 'Payments',
-    readTime: '6 min read',
-  },
-];
+// Type assertion for Supabase client to handle blog tables
+const customSupabase = supabase as unknown as CustomSupabaseClient;
 
 const BlogPreview = () => {
+  const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchLatestPosts();
+  }, []);
+
+  const fetchLatestPosts = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await customSupabase
+        .from('blog_posts')
+        .select(`
+          *,
+          profiles:author_id (first_name, last_name)
+        `)
+        .eq('published', true)
+        .order('published_at', { ascending: false })
+        .limit(3);
+
+      if (error) throw error;
+
+      // Format posts with author names
+      const formattedPosts = (data || []).map(post => {
+        const authorFirstName = post.profiles?.first_name || '';
+        const authorLastName = post.profiles?.last_name || '';
+        const authorName = authorFirstName || authorLastName 
+          ? `${authorFirstName} ${authorLastName}`.trim()
+          : 'Anonymous';
+
+        return {
+          ...post,
+          author_name: authorName,
+          categories: [],
+          tags: []
+        } as BlogPost;
+      });
+
+      setPosts(formattedPosts);
+    } catch (error) {
+      console.error('Error fetching blog posts:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <section id="blog" className="py-20 bg-groop-darker relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -51,47 +74,66 @@ const BlogPreview = () => {
             </p>
           </div>
           <div className="mt-6 md:mt-0">
-            <Link to="#" className="text-groop-blue hover:text-groop-blue-light transition-colors flex items-center gap-2">
+            <Link to="/blog" className="text-groop-blue hover:text-groop-blue-light transition-colors flex items-center gap-2">
               <span>View all articles</span>
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {blogPosts.map((post, index) => (
-            <div key={post.id} className="animate-fade-in" style={{ animationDelay: `${index * 0.1}s` }}>
-              <CustomCard interactive glassEffect className="h-full flex flex-col">
-                <CustomCardHeader>
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="px-2 py-1 text-xs rounded-full bg-groop-blue/10 text-groop-blue">
-                      {post.category}
-                    </span>
-                    <span className="text-white/50 text-sm">{post.readTime}</span>
-                  </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">{post.title}</h3>
-                </CustomCardHeader>
-                <CustomCardContent className="flex-grow">
-                  <p className="text-white/70 mb-4">{post.excerpt}</p>
-                </CustomCardContent>
-                <CustomCardFooter>
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-groop-blue/20 flex items-center justify-center">
-                      <span className="text-white font-medium">{post.author.charAt(0)}</span>
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-groop-blue"></div>
+          </div>
+        ) : posts.length === 0 ? (
+          <div className="text-center py-12">
+            <h3 className="text-xl font-medium text-white mb-2">No blog posts yet</h3>
+            <p className="text-white/70">Check back soon for new content</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {posts.map((post, index) => (
+              <div key={post.id} className="animate-fade-in" style={{ animationDelay: `${index * 0.1}s` }}>
+                <CustomCard interactive glassEffect className="h-full flex flex-col">
+                  <CustomCardHeader>
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="px-2 py-1 text-xs rounded-full bg-groop-blue/10 text-groop-blue">
+                        Blog
+                      </span>
+                      <span className="text-white/50 text-sm">
+                        {format(new Date(post.published_at || post.created_at), 'MMM d, yyyy')}
+                      </span>
                     </div>
-                    <div>
-                      <p className="text-white text-sm font-medium">{post.author}</p>
-                      <p className="text-white/50 text-xs">{post.date}</p>
+                    <h3 className="text-xl font-semibold text-white mb-2">{post.title}</h3>
+                  </CustomCardHeader>
+                  <CustomCardContent className="flex-grow">
+                    <p className="text-white/70 mb-4">
+                      {post.excerpt || post.content.substring(0, 150).replace(/<[^>]*>/g, '') + '...'}
+                    </p>
+                  </CustomCardContent>
+                  <CustomCardFooter>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-groop-blue/20 flex items-center justify-center">
+                        <span className="text-white font-medium">{post.author_name.charAt(0)}</span>
+                      </div>
+                      <div>
+                        <p className="text-white text-sm font-medium">{post.author_name}</p>
+                        <p className="text-white/50 text-xs">
+                          {format(new Date(post.published_at || post.created_at), 'MMM d, yyyy')}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <CustomButton variant="ghost" size="sm">
-                    Read more
-                  </CustomButton>
-                </CustomCardFooter>
-              </CustomCard>
-            </div>
-          ))}
-        </div>
+                    <Link to={`/blog/${post.slug}`}>
+                      <CustomButton variant="ghost" size="sm">
+                        Read more
+                      </CustomButton>
+                    </Link>
+                  </CustomCardFooter>
+                </CustomCard>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

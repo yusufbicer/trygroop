@@ -9,25 +9,14 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent } from '@/components/ui/card';
 import NotFound from './NotFound';
+import { BlogPost as BlogPostType, CustomSupabaseClient } from '@/types/blog';
 
-interface BlogPost {
-  id: string;
-  title: string;
-  slug: string;
-  content: string;
-  published: boolean;
-  featured_image: string | null;
-  created_at: string;
-  published_at: string | null;
-  author_id: string;
-  author_name?: string;
-  categories: { name: string; slug: string }[];
-  tags: { name: string; slug: string }[];
-}
+// Type assertion for Supabase client to handle blog tables
+const customSupabase = supabase as unknown as CustomSupabaseClient;
 
 const BlogPost = () => {
   const { slug } = useParams<{ slug: string }>();
-  const [post, setPost] = useState<BlogPost | null>(null);
+  const [post, setPost] = useState<BlogPostType | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -41,7 +30,7 @@ const BlogPost = () => {
     setLoading(true);
     try {
       // Fetch blog post by slug
-      const { data: postData, error } = await supabase
+      const { data: postData, error } = await customSupabase
         .from('blog_posts')
         .select(`
           *,
@@ -61,7 +50,7 @@ const BlogPost = () => {
       }
 
       // Fetch categories for the post
-      const { data: categoriesData } = await supabase
+      const { data: categoriesData } = await customSupabase
         .from('blog_posts_categories')
         .select(`
           blog_categories (name, slug)
@@ -69,7 +58,7 @@ const BlogPost = () => {
         .eq('post_id', postData.id);
 
       // Fetch tags for the post
-      const { data: tagsData } = await supabase
+      const { data: tagsData } = await customSupabase
         .from('blog_posts_tags')
         .select(`
           blog_tags (name, slug)
@@ -86,9 +75,9 @@ const BlogPost = () => {
       const formattedPost = {
         ...postData,
         author_name: authorName,
-        categories: categoriesData?.map((item) => item.blog_categories) || [],
-        tags: tagsData?.map((item) => item.blog_tags) || []
-      };
+        categories: (categoriesData || []).map((item) => item.blog_categories) || [],
+        tags: (tagsData || []).map((item) => item.blog_tags) || []
+      } as BlogPostType;
 
       setPost(formattedPost);
     } catch (error) {

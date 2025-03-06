@@ -9,22 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
+import { BlogPost, CustomSupabaseClient } from '@/types/blog';
 
-interface BlogPost {
-  id: string;
-  title: string;
-  slug: string;
-  excerpt: string | null;
-  content: string;
-  published: boolean;
-  featured_image: string | null;
-  created_at: string;
-  published_at: string | null;
-  author_id: string;
-  author_name?: string;
-  categories: { name: string; slug: string }[];
-  tags: { name: string; slug: string }[];
-}
+// Type assertion for Supabase client to handle blog tables
+const customSupabase = supabase as unknown as CustomSupabaseClient;
 
 const Blog = () => {
   const [posts, setPosts] = useState<BlogPost[]>([]);
@@ -44,7 +32,7 @@ const Blog = () => {
     setLoading(true);
     try {
       // Fetch blog posts that are published
-      const { data: postsData, error: postsError } = await supabase
+      const { data: postsData, error: postsError } = await customSupabase
         .from('blog_posts')
         .select(`
           *,
@@ -58,7 +46,7 @@ const Blog = () => {
       // Fetch categories for each post
       const postsWithCategories = await Promise.all((postsData || []).map(async (post) => {
         // Get categories
-        const { data: categoriesData } = await supabase
+        const { data: categoriesData } = await customSupabase
           .from('blog_posts_categories')
           .select(`
             blog_categories (name, slug)
@@ -66,7 +54,7 @@ const Blog = () => {
           .eq('post_id', post.id);
 
         // Get tags
-        const { data: tagsData } = await supabase
+        const { data: tagsData } = await customSupabase
           .from('blog_posts_tags')
           .select(`
             blog_tags (name, slug)
@@ -83,9 +71,9 @@ const Blog = () => {
         return {
           ...post,
           author_name: authorName,
-          categories: categoriesData?.map((item) => item.blog_categories) || [],
-          tags: tagsData?.map((item) => item.blog_tags) || []
-        };
+          categories: (categoriesData || []).map(item => item.blog_categories) || [],
+          tags: (tagsData || []).map(item => item.blog_tags) || []
+        } as BlogPost;
       }));
 
       setPosts(postsWithCategories);
@@ -99,14 +87,14 @@ const Blog = () => {
   const fetchCategoriesAndTags = async () => {
     try {
       // Fetch all categories
-      const { data: categoriesData } = await supabase
+      const { data: categoriesData } = await customSupabase
         .from('blog_categories')
         .select('*')
         .order('name');
 
       // Fetch post counts for each category
       const categoriesWithCount = await Promise.all((categoriesData || []).map(async (category) => {
-        const { count } = await supabase
+        const { count } = await customSupabase
           .from('blog_posts_categories')
           .select('*', { count: 'exact', head: true })
           .eq('category_id', category.id);
@@ -120,14 +108,14 @@ const Blog = () => {
       setCategories(categoriesWithCount);
 
       // Fetch all tags
-      const { data: tagsData } = await supabase
+      const { data: tagsData } = await customSupabase
         .from('blog_tags')
         .select('*')
         .order('name');
 
       // Fetch post counts for each tag
       const tagsWithCount = await Promise.all((tagsData || []).map(async (tag) => {
-        const { count } = await supabase
+        const { count } = await customSupabase
           .from('blog_posts_tags')
           .select('*', { count: 'exact', head: true })
           .eq('tag_id', tag.id);

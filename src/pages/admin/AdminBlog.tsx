@@ -61,37 +61,15 @@ import {
   Filter
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { BlogPost, Category, Tag as TagType, CustomSupabaseClient } from '@/types/blog';
 
-interface BlogPost {
-  id: string;
-  title: string;
-  slug: string;
-  content: string;
-  excerpt: string | null;
-  published: boolean;
-  featured_image: string | null;
-  author_id: string;
-  created_at: string;
-  updated_at: string;
-  published_at: string | null;
-}
-
-interface Category {
-  id: string;
-  name: string;
-  slug: string;
-}
-
-interface Tag {
-  id: string;
-  name: string;
-  slug: string;
-}
+// Type assertion for Supabase client to handle blog tables
+const customSupabase = supabase as unknown as CustomSupabaseClient;
 
 const AdminBlog = () => {
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
+  const [tags, setTags] = useState<TagType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPublished, setFilterPublished] = useState<boolean | null>(null);
@@ -123,7 +101,7 @@ const AdminBlog = () => {
   const fetchPosts = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await customSupabase
         .from('blog_posts')
         .select('*')
         .order('created_at', { ascending: false });
@@ -144,7 +122,7 @@ const AdminBlog = () => {
 
   const fetchCategories = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await customSupabase
         .from('blog_categories')
         .select('*')
         .order('name', { ascending: true });
@@ -158,7 +136,7 @@ const AdminBlog = () => {
 
   const fetchTags = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await customSupabase
         .from('blog_tags')
         .select('*')
         .order('name', { ascending: true });
@@ -173,7 +151,7 @@ const AdminBlog = () => {
   const fetchPostCategoriesAndTags = async (postId: string) => {
     try {
       // Fetch categories for the post
-      const { data: categoriesData } = await supabase
+      const { data: categoriesData } = await customSupabase
         .from('blog_posts_categories')
         .select('category_id')
         .eq('post_id', postId);
@@ -181,7 +159,7 @@ const AdminBlog = () => {
       setPostCategories((categoriesData || []).map(item => item.category_id));
 
       // Fetch tags for the post
-      const { data: tagsData } = await supabase
+      const { data: tagsData } = await customSupabase
         .from('blog_posts_tags')
         .select('tag_id')
         .eq('post_id', postId);
@@ -216,7 +194,7 @@ const AdminBlog = () => {
       
       if (isNewPost) {
         // Create new post
-        result = await supabase
+        result = await customSupabase
           .from('blog_posts')
           .insert({
             ...postData,
@@ -233,7 +211,7 @@ const AdminBlog = () => {
         });
       } else {
         // Update existing post
-        result = await supabase
+        result = await customSupabase
           .from('blog_posts')
           .update(postData)
           .eq('id', editingPost.id)
@@ -243,12 +221,12 @@ const AdminBlog = () => {
         if (result.error) throw result.error;
         
         // First delete all existing category and tag relationships
-        await supabase
+        await customSupabase
           .from('blog_posts_categories')
           .delete()
           .eq('post_id', editingPost.id);
           
-        await supabase
+        await customSupabase
           .from('blog_posts_tags')
           .delete()
           .eq('post_id', editingPost.id);
@@ -268,7 +246,7 @@ const AdminBlog = () => {
           category_id: categoryId
         }));
         
-        const { error: categoriesError } = await supabase
+        const { error: categoriesError } = await customSupabase
           .from('blog_posts_categories')
           .insert(categoryRelations);
           
@@ -282,7 +260,7 @@ const AdminBlog = () => {
           tag_id: tagId
         }));
         
-        const { error: tagsError } = await supabase
+        const { error: tagsError } = await customSupabase
           .from('blog_posts_tags')
           .insert(tagRelations);
           
@@ -306,18 +284,18 @@ const AdminBlog = () => {
     
     try {
       // First delete category and tag relationships
-      await supabase
+      await customSupabase
         .from('blog_posts_categories')
         .delete()
         .eq('post_id', postToDelete);
         
-      await supabase
+      await customSupabase
         .from('blog_posts_tags')
         .delete()
         .eq('post_id', postToDelete);
       
       // Then delete the post
-      const { error } = await supabase
+      const { error } = await customSupabase
         .from('blog_posts')
         .delete()
         .eq('id', postToDelete);
@@ -350,7 +328,7 @@ const AdminBlog = () => {
         ? newCategory.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
         : newCategory.slug;
         
-      const { data, error } = await supabase
+      const { data, error } = await customSupabase
         .from('blog_categories')
         .insert({
           name: newCategory.name,
@@ -392,7 +370,7 @@ const AdminBlog = () => {
         ? newTag.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
         : newTag.slug;
         
-      const { data, error } = await supabase
+      const { data, error } = await customSupabase
         .from('blog_tags')
         .insert({
           name: newTag.name,
@@ -460,7 +438,9 @@ const AdminBlog = () => {
       author_id: user?.id || '',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      published_at: null
+      published_at: null,
+      categories: [],
+      tags: []
     });
     setPostCategories([]);
     setPostTags([]);
@@ -494,7 +474,7 @@ const AdminBlog = () => {
         updated_at: now
       };
       
-      const { error } = await supabase
+      const { error } = await customSupabase
         .from('blog_posts')
         .update(updates)
         .eq('id', post.id);
