@@ -41,7 +41,7 @@ export const useBlog = () => {
               .from('blog_posts_categories')
               .select(`
                 category_id,
-                blog_categories:category_id(name, slug)
+                blog_categories:category_id(id, name, slug)
               `)
               .eq('post_id', post.id);
             
@@ -50,7 +50,7 @@ export const useBlog = () => {
               .from('blog_posts_tags')
               .select(`
                 tag_id,
-                blog_tags:tag_id(name, slug)
+                blog_tags:tag_id(id, name, slug)
               `)
               .eq('post_id', post.id);
             
@@ -105,7 +105,7 @@ export const useBlog = () => {
               .from('blog_posts_categories')
               .select(`
                 category_id,
-                blog_categories:category_id(name, slug)
+                blog_categories:category_id(id, name, slug)
               `)
               .eq('post_id', post.id);
             
@@ -114,7 +114,7 @@ export const useBlog = () => {
               .from('blog_posts_tags')
               .select(`
                 tag_id,
-                blog_tags:tag_id(name, slug)
+                blog_tags:tag_id(id, name, slug)
               `)
               .eq('post_id', post.id);
             
