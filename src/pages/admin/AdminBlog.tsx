@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBlog } from '@/hooks/useBlog';
@@ -213,7 +212,8 @@ const AdminBlog = () => {
             excerpt: postForm.excerpt || null,
             featured_image: postForm.featured_image || null,
             published: postForm.published,
-            author_id: user.id
+            author_id: user.id,
+            published_at: postForm.published ? new Date().toISOString() : null
           },
           categoryIds: postForm.selectedCategories,
           tagIds: postForm.selectedTags
@@ -428,13 +428,13 @@ const AdminBlog = () => {
                       {post.excerpt || post.content.substring(0, 150) + '...'}
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {post.categories.map((category, index) => (
-                        <Badge key={index} variant="outline">
+                      {post.categories.map((category) => (
+                        <Badge key={category.id || category.slug} variant="outline">
                           {category.name}
                         </Badge>
                       ))}
-                      {post.tags.map((tag, index) => (
-                        <Badge key={index} variant="secondary">
+                      {post.tags.map((tag) => (
+                        <Badge key={tag.id || tag.slug} variant="secondary">
                           {tag.name}
                         </Badge>
                       ))}
@@ -503,7 +503,7 @@ const AdminBlog = () => {
           ) : (
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
               {categories.map((category) => (
-                <Card key={category.id}>
+                <Card key={category.id || category.slug}>
                   <CardHeader>
                     <CardTitle>{category.name}</CardTitle>
                     <CardDescription>
@@ -546,7 +546,7 @@ const AdminBlog = () => {
           ) : (
             <div className="flex flex-wrap gap-2">
               {tags.map((tag) => (
-                <Badge key={tag.id} className="text-base py-2 px-4">
+                <Badge key={tag.id || tag.slug} className="text-base py-2 px-4">
                   {tag.name}
                 </Badge>
               ))}
@@ -635,25 +635,25 @@ const AdminBlog = () => {
               <Label>Categories</Label>
               <div className="grid grid-cols-2 gap-2">
                 {categories.map((category) => (
-                  <div key={category.id} className="flex items-center space-x-2">
+                  <div key={category.id || category.slug} className="flex items-center space-x-2">
                     <Checkbox
-                      id={`category-${category.id}`}
-                      checked={postForm.selectedCategories.includes(category.id)}
+                      id={`category-${category.id || category.slug}`}
+                      checked={postForm.selectedCategories.includes(category.id || category.slug)}
                       onCheckedChange={(checked) => {
                         if (checked) {
                           setPostForm({
                             ...postForm,
-                            selectedCategories: [...postForm.selectedCategories, category.id]
+                            selectedCategories: [...postForm.selectedCategories, category.id || category.slug]
                           });
                         } else {
                           setPostForm({
                             ...postForm,
-                            selectedCategories: postForm.selectedCategories.filter(id => id !== category.id)
+                            selectedCategories: postForm.selectedCategories.filter(id => id !== (category.id || category.slug))
                           });
                         }
                       }}
                     />
-                    <Label htmlFor={`category-${category.id}`} className="cursor-pointer">
+                    <Label htmlFor={`category-${category.id || category.slug}`} className="cursor-pointer">
                       {category.name}
                     </Label>
                   </div>
@@ -665,25 +665,25 @@ const AdminBlog = () => {
               <Label>Tags</Label>
               <div className="grid grid-cols-2 gap-2">
                 {tags.map((tag) => (
-                  <div key={tag.id} className="flex items-center space-x-2">
+                  <div key={tag.id || tag.slug} className="flex items-center space-x-2">
                     <Checkbox
-                      id={`tag-${tag.id}`}
-                      checked={postForm.selectedTags.includes(tag.id)}
+                      id={`tag-${tag.id || tag.slug}`}
+                      checked={postForm.selectedTags.includes(tag.id || tag.slug)}
                       onCheckedChange={(checked) => {
                         if (checked) {
                           setPostForm({
                             ...postForm,
-                            selectedTags: [...postForm.selectedTags, tag.id]
+                            selectedTags: [...postForm.selectedTags, tag.id || tag.slug]
                           });
                         } else {
                           setPostForm({
                             ...postForm,
-                            selectedTags: postForm.selectedTags.filter(id => id !== tag.id)
+                            selectedTags: postForm.selectedTags.filter(id => id !== (tag.id || tag.slug))
                           });
                         }
                       }}
                     />
-                    <Label htmlFor={`tag-${tag.id}`} className="cursor-pointer">
+                    <Label htmlFor={`tag-${tag.id || tag.slug}`} className="cursor-pointer">
                       {tag.name}
                     </Label>
                   </div>
