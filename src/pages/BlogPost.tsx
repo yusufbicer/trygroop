@@ -24,7 +24,7 @@ const BlogPost = () => {
           created_at,
           published_at,
           author_id,
-          profiles:author_id(first_name, last_name)
+          profiles(first_name, last_name)
         `)
         .eq('slug', slug)
         .eq('published', true)
@@ -35,11 +35,14 @@ const BlogPost = () => {
         return null;
       }
 
+      // Fix the author_name extraction to work with the profiles object structure
+      const authorName = data.profiles ? 
+        `${data.profiles.first_name || ''} ${data.profiles.last_name || ''}`.trim() : 
+        'Unknown';
+
       return {
         ...data,
-        author_name: data.profiles ? 
-          `${data.profiles.first_name || ''} ${data.profiles.last_name || ''}`.trim() : 
-          'Unknown'
+        author_name: authorName
       };
     }
   });
