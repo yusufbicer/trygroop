@@ -45,11 +45,15 @@ export const useBlog = () => {
             `)
             .eq('post_id', post.id);
 
-          const categories = categoriesData?.map(item => ({
-            id: item.blog_categories ? item.blog_categories.id : null,
-            name: item.blog_categories ? item.blog_categories.name : null,
-            slug: item.blog_categories ? item.blog_categories.slug : null
-          })) || [];
+          const categories = categoriesData?.map(item => {
+            // Check if blog_categories exists and is an object
+            const categoryData = item.blog_categories;
+            return {
+              id: categoryData?.id || null,
+              name: categoryData?.name || null,
+              slug: categoryData?.slug || null
+            };
+          }) || [];
 
           // Fetch tags for each post
           const { data: tagsData } = await supabase
@@ -60,17 +64,25 @@ export const useBlog = () => {
             `)
             .eq('post_id', post.id);
 
-          const tags = tagsData?.map(item => ({
-            id: item.blog_tags ? item.blog_tags.id : null,
-            name: item.blog_tags ? item.blog_tags.name : null,
-            slug: item.blog_tags ? item.blog_tags.slug : null
-          })) || [];
+          const tags = tagsData?.map(item => {
+            // Check if blog_tags exists and is an object
+            const tagData = item.blog_tags;
+            return {
+              id: tagData?.id || null,
+              name: tagData?.name || null,
+              slug: tagData?.slug || null
+            };
+          }) || [];
+
+          // Safely access profiles data
+          const profileData = post.profiles;
+          const authorName = profileData ? 
+            `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() : 
+            'Unknown';
 
           return {
             ...post,
-            author_name: post.profiles ? 
-              `${post.profiles.first_name || ''} ${post.profiles.last_name || ''}`.trim() : 
-              'Unknown',
+            author_name: authorName,
             categories,
             tags
           };
@@ -161,11 +173,15 @@ export const useAdminBlog = () => {
             `)
             .eq('post_id', post.id);
 
-          const categories = categoriesData?.map(item => ({
-            id: item.blog_categories ? item.blog_categories.id : null,
-            name: item.blog_categories ? item.blog_categories.name : null,
-            slug: item.blog_categories ? item.blog_categories.slug : null
-          })) || [];
+          const categories = categoriesData?.map(item => {
+            // Check if blog_categories exists and is an object
+            const categoryData = item.blog_categories;
+            return {
+              id: categoryData?.id || null,
+              name: categoryData?.name || null,
+              slug: categoryData?.slug || null
+            };
+          }) || [];
 
           // Fetch tags for each post
           const { data: tagsData } = await supabase
@@ -176,17 +192,25 @@ export const useAdminBlog = () => {
             `)
             .eq('post_id', post.id);
 
-          const tags = tagsData?.map(item => ({
-            id: item.blog_tags ? item.blog_tags.id : null,
-            name: item.blog_tags ? item.blog_tags.name : null,
-            slug: item.blog_tags ? item.blog_tags.slug : null
-          })) || [];
+          const tags = tagsData?.map(item => {
+            // Check if blog_tags exists and is an object
+            const tagData = item.blog_tags;
+            return {
+              id: tagData?.id || null,
+              name: tagData?.name || null,
+              slug: tagData?.slug || null
+            };
+          }) || [];
+
+          // Safely access profiles data
+          const profileData = post.profiles;
+          const authorName = profileData ? 
+            `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() : 
+            'Unknown';
 
           return {
             ...post,
-            author_name: post.profiles ? 
-              `${post.profiles.first_name || ''} ${post.profiles.last_name || ''}`.trim() : 
-              'Unknown',
+            author_name: authorName,
             categories,
             tags
           };

@@ -1,3 +1,4 @@
+
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -35,8 +36,9 @@ const BlogPost = () => {
       }
 
       // Fix the author_name extraction to work with the profiles object structure
-      const authorName = data.profiles ? 
-        `${data.profiles.first_name || ''} ${data.profiles.last_name || ''}`.trim() : 
+      const profileData = data.profiles;
+      const authorName = profileData ? 
+        `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() : 
         'Unknown';
 
       return {

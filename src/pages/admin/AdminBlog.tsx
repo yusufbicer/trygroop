@@ -79,7 +79,6 @@ const AdminBlog = () => {
     createTag
   } = useAdminBlog();
 
-  // Form state for posts
   const [postForm, setPostForm] = useState({
     title: '',
     slug: '',
@@ -91,25 +90,20 @@ const AdminBlog = () => {
     selectedTags: [] as string[]
   });
 
-  // Form state for categories and tags
   const [categoryForm, setCategoryForm] = useState({ name: '', slug: '' });
   const [tagForm, setTagForm] = useState({ name: '', slug: '' });
 
-  // Modal states
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isTagModalOpen, setIsTagModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-  // Currently editing state
   const [currentPostId, setCurrentPostId] = useState<string | null>(null);
   const [postToDelete, setPostToDelete] = useState<string | null>(null);
 
-  // Search and filter state
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft'>('all');
 
-  // Filtered posts based on search and status filter
   const filteredPosts = allPosts.filter(post => {
     const matchesSearch = 
       post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -123,7 +117,6 @@ const AdminBlog = () => {
     return matchesSearch && matchesStatus;
   });
 
-  // Generate a slug from the title
   const generateSlug = (title: string) => {
     return title
       .toLowerCase()
@@ -131,7 +124,6 @@ const AdminBlog = () => {
       .replace(/\s+/g, '-');
   };
 
-  // Reset the post form
   const resetPostForm = () => {
     setPostForm({
       title: '',
@@ -146,13 +138,11 @@ const AdminBlog = () => {
     setCurrentPostId(null);
   };
 
-  // Function to open the post form for a new post
   const handleNewPost = () => {
     resetPostForm();
     setIsPostModalOpen(true);
   };
 
-  // Function to open the post form for editing
   const handleEditPost = (post: BlogPost) => {
     setPostForm({
       title: post.title,
@@ -168,7 +158,6 @@ const AdminBlog = () => {
     setIsPostModalOpen(true);
   };
 
-  // Function to handle post form submission
   const handlePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -183,11 +172,9 @@ const AdminBlog = () => {
     }
 
     try {
-      // Generate slug if not provided
       const slug = postForm.slug || generateSlug(postForm.title);
 
       if (currentPostId) {
-        // Update existing post
         await updatePost.mutateAsync({
           id: currentPostId,
           post: {
@@ -203,7 +190,6 @@ const AdminBlog = () => {
           tagIds: postForm.selectedTags
         });
       } else {
-        // Create new post
         await createPost.mutateAsync({
           post: {
             title: postForm.title,
@@ -213,7 +199,9 @@ const AdminBlog = () => {
             featured_image: postForm.featured_image || null,
             published: postForm.published,
             author_id: user.id,
-            published_at: postForm.published ? new Date().toISOString() : null
+            published_at: postForm.published ? new Date().toISOString() : null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           },
           categoryIds: postForm.selectedCategories,
           tagIds: postForm.selectedTags
@@ -227,7 +215,6 @@ const AdminBlog = () => {
     }
   };
 
-  // Function to handle category form submission
   const handleCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -241,7 +228,6 @@ const AdminBlog = () => {
     }
 
     try {
-      // Generate slug if not provided
       const slug = categoryForm.slug || generateSlug(categoryForm.name);
 
       await createCategory.mutateAsync({
@@ -256,7 +242,6 @@ const AdminBlog = () => {
     }
   };
 
-  // Function to handle tag form submission
   const handleTagSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -270,7 +255,6 @@ const AdminBlog = () => {
     }
 
     try {
-      // Generate slug if not provided
       const slug = tagForm.slug || generateSlug(tagForm.name);
 
       await createTag.mutateAsync({
@@ -285,7 +269,6 @@ const AdminBlog = () => {
     }
   };
 
-  // Function to handle post deletion
   const handleDeletePost = async () => {
     if (!postToDelete) return;
 
@@ -298,13 +281,11 @@ const AdminBlog = () => {
     }
   };
 
-  // Function to open the delete confirmation dialog
   const confirmDeletePost = (postId: string) => {
     setPostToDelete(postId);
     setIsDeleteDialogOpen(true);
   };
 
-  // Format date for display
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('en-US', {
@@ -555,7 +536,6 @@ const AdminBlog = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Post Form Dialog */}
       <Dialog open={isPostModalOpen} onOpenChange={setIsPostModalOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
@@ -723,7 +703,6 @@ const AdminBlog = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Category Form Dialog */}
       <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
         <DialogContent>
           <DialogHeader>
@@ -781,7 +760,6 @@ const AdminBlog = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Tag Form Dialog */}
       <Dialog open={isTagModalOpen} onOpenChange={setIsTagModalOpen}>
         <DialogContent>
           <DialogHeader>
@@ -839,7 +817,6 @@ const AdminBlog = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
