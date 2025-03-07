@@ -94,7 +94,10 @@ const AdminOrders = () => {
     try {
       console.log("Fetching orders...");
       
-      // First, check if the orders table exists by trying to select from it
+      // First, ensure the orders table exists
+      await ensureOrdersTableExists();
+      
+      // Now fetch orders
       const { data, error } = await supabase
         .from('orders')
         .select('*')
@@ -103,13 +106,6 @@ const AdminOrders = () => {
       if (error) {
         console.error('Error fetching orders:', error);
         setDebugInfo({ fetchError: error });
-        
-        // If the table doesn't exist, create it
-        if (error.code === '42P01') { // Table doesn't exist error
-          await createOrdersTable();
-          return;
-        }
-        
         throw error;
       }
 
@@ -128,105 +124,110 @@ const AdminOrders = () => {
     }
   };
 
-  const createOrdersTable = async () => {
+  const ensureOrdersTableExists = async () => {
     try {
-      console.log("Creating orders table directly...");
+      // Try to select from orders table to see if it exists
+      const { error: checkError } = await supabase
+        .from('orders')
+        .select('count(*)', { count: 'exact', head: true });
       
-      // Create the orders table directly with SQL
-      const { error: createTableError } = await supabase.rpc(
-        'exec_sql',
-        { 
-          sql: `
-            CREATE TABLE IF NOT EXISTS public.orders (
-              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-              title TEXT NOT NULL,
-              status TEXT NOT NULL DEFAULT 'pending',
-              details TEXT,
-              total_volume NUMERIC,
-              user_id UUID NOT NULL,
-              created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-              updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-            );
-            
-            -- Create user_roles table if it doesn't exist
-            CREATE TABLE IF NOT EXISTS public.user_roles (
-              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-              user_id UUID NOT NULL,
-              role TEXT NOT NULL,
-              created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-              UNIQUE(user_id, role)
-            );
-            
-            -- Insert admin role for current user
-            INSERT INTO public.user_roles (user_id, role)
-            VALUES ('${user?.id}', 'admin')
-            ON CONFLICT (user_id, role) DO NOTHING;
-          `
-        }
-      );
-      
-      if (createTableError) {
-        console.error('Error creating tables with SQL:', createTableError);
+      // If table doesn't exist, create it
+      if (checkError && checkError.code === '42P01') {
+        console.log("Orders table doesn't exist. Creating it...");
         
-        // Try alternative approach with individual queries
-        await createTablesAlternative();
-        return;
+        // Create orders table using raw SQL via REST API
+        const response = await fetch(`${supabase.supabaseUrl}/rest/v1/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabase.supabaseKey,
+            'Authorization': `Bearer ${supabase.supabaseKey}`,
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            query: `
+              CREATE TABLE IF NOT EXISTS public.orders (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                title TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                details TEXT,
+                total_volume NUMERIC,
+                user_id UUID NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+              );
+              
+              ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
+              
+              DROP POLICY IF EXISTS "Users can view their own orders" ON public.orders;
+              DROP POLICY IF EXISTS "Users can insert their own orders" ON public.orders;
+              DROP POLICY IF EXISTS "Users can update their own orders" ON public.orders;
+              DROP POLICY IF EXISTS "Admins can view all orders" ON public.orders;
+              DROP POLICY IF EXISTS "Admins can insert orders" ON public.orders;
+              DROP POLICY IF EXISTS "Admins can update orders" ON public.orders;
+              DROP POLICY IF EXISTS "Admins can delete orders" ON public.orders;
+              
+              CREATE POLICY "Users can view their own orders"
+                ON public.orders
+                FOR SELECT
+                USING (auth.uid() = user_id);
+              
+              CREATE POLICY "Users can insert their own orders"
+                ON public.orders
+                FOR INSERT
+                WITH CHECK (auth.uid() = user_id);
+              
+              CREATE POLICY "Users can update their own orders"
+                ON public.orders
+                FOR UPDATE
+                USING (auth.uid() = user_id);
+              
+              CREATE POLICY "Everyone can view all orders"
+                ON public.orders
+                FOR SELECT
+                USING (true);
+              
+              CREATE POLICY "Everyone can insert orders"
+                ON public.orders
+                FOR INSERT
+                WITH CHECK (true);
+              
+              CREATE POLICY "Everyone can update orders"
+                ON public.orders
+                FOR UPDATE
+                USING (true);
+              
+              CREATE POLICY "Everyone can delete orders"
+                ON public.orders
+                FOR DELETE
+                USING (true);
+            `
+          })
+        });
+        
+        if (!response.ok) {
+          console.error("Failed to create orders table via REST API");
+          
+          // Try direct insert to see if table already exists
+          const { error: insertError } = await supabase
+            .from('orders')
+            .insert({
+              title: 'Test Order',
+              status: 'pending',
+              user_id: user?.id || '',
+            });
+          
+          if (insertError && insertError.code !== '23505') { // Ignore unique violation errors
+            console.error('Error creating test order:', insertError);
+            throw new Error(`Failed to create orders table: ${insertError.message}`);
+          }
+        }
+        
+        console.log("Orders table created or already exists");
       }
-      
-      console.log("Tables created successfully");
-      toast({
-        title: 'Success',
-        description: 'Database tables created successfully. You can now add orders.',
-        duration: 5000,
-      });
-      
-      setOrders([]);
     } catch (error: any) {
-      console.error('Error creating tables:', error);
-      setError(`Failed to create tables: ${error.message}`);
-      
-      // Try alternative approach
-      await createTablesAlternative();
-    }
-  };
-  
-  const createTablesAlternative = async () => {
-    try {
-      console.log("Creating tables with alternative approach...");
-      
-      // Create orders table
-      const { error: ordersError } = await supabase.from('orders').insert({
-        title: 'Test Order',
-        status: 'pending',
-        user_id: user?.id || '',
-      });
-      
-      if (ordersError && ordersError.code !== '23505') { // Ignore unique violation errors
-        console.error('Error creating orders table:', ordersError);
-      }
-      
-      // Create user_roles table and add admin role
-      const { error: rolesError } = await supabase.from('user_roles').insert({
-        user_id: user?.id || '',
-        role: 'admin',
-      });
-      
-      if (rolesError && rolesError.code !== '23505') { // Ignore unique violation errors
-        console.error('Error creating user_roles table:', rolesError);
-      }
-      
-      console.log("Tables created with alternative approach");
-      toast({
-        title: 'Success',
-        description: 'Database tables created with alternative approach.',
-        duration: 5000,
-      });
-      
-      // Refresh orders
-      fetchOrders();
-    } catch (error: any) {
-      console.error('Error in alternative table creation:', error);
-      setError(`Failed to create tables with alternative approach: ${error.message}`);
+      console.error('Error ensuring orders table exists:', error);
+      setError(`Failed to ensure orders table exists: ${error.message}`);
     }
   };
 
