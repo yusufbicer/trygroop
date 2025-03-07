@@ -44,7 +44,8 @@ const SupabaseDiagnostic = () => {
   const [ordersCount, setOrdersCount] = useState<DiagnosticResult | null>(null);
   const [userRoles, setUserRoles] = useState<DiagnosticResult | null>(null);
   const [userInfo, setUserInfo] = useState<DiagnosticResult | null>(null);
-  const [useSampleData, setUseSampleData] = useState(false);
+  // Always use sample data by default to ensure something is displayed
+  const [useSampleData, setUseSampleData] = useState(true);
 
   useEffect(() => {
     runDiagnostics();
