@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BlogPost } from '@/types/blog';
 import { Link } from 'react-router-dom';
@@ -13,7 +12,7 @@ interface BlogPreviewProps {
 
 const BlogPreview: React.FC<BlogPreviewProps> = ({ posts: providedPosts }) => {
   // Use provided posts or fetch posts if not provided
-  const { posts: fetchedPosts, isLoading } = useBlog();
+  const { data: fetchedPosts = [], isLoading, error } = useBlog();
   const posts = providedPosts || fetchedPosts;
 
   const formatDate = (dateString: string) => {
@@ -59,6 +58,25 @@ const BlogPreview: React.FC<BlogPreviewProps> = ({ posts: providedPosts }) => {
     );
   }
 
+  // Show error state if there's an error
+  if (!providedPosts && error) {
+    return (
+      <section id="blog" className="py-16 bg-gray-50 scroll-mt-16">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold mb-4">Latest From Our Blog</h2>
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              Stay updated with our latest news, insights, and announcements about global importing and shipping.
+            </p>
+          </div>
+          <div className="text-center text-red-500">
+            <p>There was an error loading the blog posts. Please try again later.</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section id="blog" className="py-16 bg-gray-50 scroll-mt-16">
       <div className="container mx-auto px-4">
@@ -86,6 +104,13 @@ const BlogPreview: React.FC<BlogPreviewProps> = ({ posts: providedPosts }) => {
                   <div className="flex items-center space-x-2 text-sm text-gray-500 mb-2">
                     <Calendar className="h-4 w-4" />
                     <span>{formatDate(post.created_at)}</span>
+                    {post.author_name && (
+                      <>
+                        <span>•</span>
+                        <User className="h-4 w-4" />
+                        <span>{post.author_name}</span>
+                      </>
+                    )}
                   </div>
                   <CardTitle className="text-xl">
                     <Link to={`/blog/${post.slug}`} className="hover:text-primary transition-colors">
@@ -93,7 +118,7 @@ const BlogPreview: React.FC<BlogPreviewProps> = ({ posts: providedPosts }) => {
                     </Link>
                   </CardTitle>
                   <CardDescription className="mt-2">
-                    {post.excerpt || (post.content.substring(0, 120) + '...')}
+                    {post.excerpt || (post.content && post.content.length > 120 ? post.content.substring(0, 120) + '...' : post.content)}
                   </CardDescription>
                 </CardHeader>
                 <CardFooter className="pt-0">
