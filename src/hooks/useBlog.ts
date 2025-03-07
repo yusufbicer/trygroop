@@ -48,10 +48,14 @@ export const useBlog = () => {
           const categories = categoriesData?.map(item => {
             // Check if blog_categories exists and is an object
             const categoryData = item.blog_categories;
-            return {
-              id: categoryData?.id || null,
-              name: categoryData?.name || null,
-              slug: categoryData?.slug || null
+            return categoryData ? {
+              id: categoryData.id || null,
+              name: categoryData.name || null,
+              slug: categoryData.slug || null
+            } : {
+              id: null,
+              name: null,
+              slug: null
             };
           }) || [];
 
@@ -67,10 +71,14 @@ export const useBlog = () => {
           const tags = tagsData?.map(item => {
             // Check if blog_tags exists and is an object
             const tagData = item.blog_tags;
-            return {
-              id: tagData?.id || null,
-              name: tagData?.name || null,
-              slug: tagData?.slug || null
+            return tagData ? {
+              id: tagData.id || null,
+              name: tagData.name || null,
+              slug: tagData.slug || null
+            } : {
+              id: null,
+              name: null,
+              slug: null
             };
           }) || [];
 
@@ -176,10 +184,14 @@ export const useAdminBlog = () => {
           const categories = categoriesData?.map(item => {
             // Check if blog_categories exists and is an object
             const categoryData = item.blog_categories;
-            return {
-              id: categoryData?.id || null,
-              name: categoryData?.name || null,
-              slug: categoryData?.slug || null
+            return categoryData ? {
+              id: categoryData.id || null,
+              name: categoryData.name || null,
+              slug: categoryData.slug || null
+            } : {
+              id: null,
+              name: null,
+              slug: null
             };
           }) || [];
 
@@ -195,10 +207,14 @@ export const useAdminBlog = () => {
           const tags = tagsData?.map(item => {
             // Check if blog_tags exists and is an object
             const tagData = item.blog_tags;
-            return {
-              id: tagData?.id || null,
-              name: tagData?.name || null,
-              slug: tagData?.slug || null
+            return tagData ? {
+              id: tagData.id || null,
+              name: tagData.name || null,
+              slug: tagData.slug || null
+            } : {
+              id: null,
+              name: null,
+              slug: null
             };
           }) || [];
 
