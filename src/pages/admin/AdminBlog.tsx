@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useBlog } from '@/hooks/useBlog';
+import { useAdminBlog } from '@/hooks/useBlog';
 import { BlogPost, Category, Tag } from '@/types/blog';
 import { useAuth } from '@/context/AuthContext';
 import { 
@@ -77,7 +77,7 @@ const AdminBlog = () => {
     deletePost,
     createCategory,
     createTag
-  } = useBlog();
+  } = useAdminBlog();
 
   // Form state for posts
   const [postForm, setPostForm] = useState({

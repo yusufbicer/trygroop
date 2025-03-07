@@ -197,7 +197,7 @@ export const useAdminBlog = () => {
     }
   });
   
-  // Fetch all categories (same as non-admin)
+  // Fetch all categories
   const { data: categories = [] } = useQuery({
     queryKey: ['blog-categories'],
     queryFn: async () => {
@@ -215,7 +215,7 @@ export const useAdminBlog = () => {
     }
   });
   
-  // Fetch all tags (same as non-admin)
+  // Fetch all tags
   const { data: tags = [] } = useQuery({
     queryKey: ['blog-tags'],
     queryFn: async () => {
