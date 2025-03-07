@@ -1,4 +1,3 @@
-
 // Blog-related type definitions for use with Supabase
 import { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/integrations/supabase/types';
@@ -18,6 +17,10 @@ export interface BlogPost {
   author_name?: string;
   categories: Category[];
   tags: Tag[];
+  profiles?: {
+    first_name: string | null;
+    last_name: string | null;
+  };
 }
 
 export interface Category {

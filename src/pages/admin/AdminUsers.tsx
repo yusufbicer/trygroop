@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -331,7 +330,7 @@ const AdminUsers = () => {
                         <Badge>User</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" className="h-8 w-8 p-0">
@@ -367,7 +366,7 @@ const AdminUsers = () => {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </TableCell>
+                    
                   </TableRow>
                 ))}
               </TableBody>

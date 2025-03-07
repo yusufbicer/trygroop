@@ -1,7 +1,6 @@
-
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useOrders } from '@/hooks/useOrders';
+import { useState, useEffect, useMemo } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import {
   Card,
   CardContent,
@@ -11,7 +10,6 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { CustomButton } from '@/components/ui/CustomButton';
 import {
   Table,
   TableBody,
@@ -21,48 +19,94 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Package, Search, MoreHorizontal, Filter, Eye, Trash } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { MoreHorizontal, Copy, Edit, Trash2, File } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Order } from '@/types/data'; // Make sure to import Order type
+import { Search } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
+interface OrderData {
+  id: string;
+  title: string;
+  status: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+  details: string | null;
+  total_volume: number | null;
+}
 
 const AdminOrders = () => {
-  const navigate = useNavigate();
-  const { orders, isLoading, deleteOrder } = useOrders();
+  const [orders, setOrders] = useState<OrderData[] | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
+  const [statusFilter, setStatusFilter] = useState('');
   const { toast } = useToast();
-  
-  // Status filter
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  
-  // Update filtered orders when search term, status filter, or orders change
+
   useEffect(() => {
-    let result = [...orders];
-    
-    // Apply search filter
-    if (searchTerm) {
-      result = result.filter((order) =>
-        order.title.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+    fetchOrders();
+  }, []);
+
+  const fetchOrders = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*');
+
+      if (error) throw error;
+
+      setOrders(data);
+    } catch (error: any) {
+      console.error('Error fetching orders:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to fetch orders',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  // Fix the filter function inside the component
+  const filteredOrders = useMemo(() => {
+    if (!orders) return [];
     
-    // Apply status filter
-    if (statusFilter) {
-      result = result.filter((order) =>
-        order.status.toLowerCase() === statusFilter.toLowerCase()
-      );
-    }
-    
-    setFilteredOrders(result);
+    return orders.filter(order => {
+      // Filter by search term (title, id, etc.)
+      const matchesSearch = !searchTerm || 
+        order.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.id.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // Filter by status
+      const matchesStatus = !statusFilter || order.status === statusFilter;
+      
+      return matchesSearch && matchesStatus;
+    });
   }, [orders, searchTerm, statusFilter]);
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
@@ -71,55 +115,16 @@ const AdminOrders = () => {
     }).format(date);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'completed':
-        return 'bg-green-500/10 text-green-500 hover:bg-green-500/20';
-      case 'processing':
-        return 'bg-blue-500/10 text-blue-500 hover:bg-blue-500/20';
-      case 'shipping':
-        return 'bg-purple-500/10 text-purple-500 hover:bg-purple-500/20';
-      case 'pending':
-      default:
-        return 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20';
-    }
-  };
-
-  const handleViewOrder = (orderId: string) => {
-    navigate(`/admin/orders/${orderId}`);
-  };
-
-  const handleDeleteOrder = async (orderId: string) => {
-    try {
-      await deleteOrder.mutateAsync(orderId);
-      toast({
-        title: 'Success',
-        description: 'Order deleted successfully',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to delete order',
-        variant: 'destructive',
-      });
-    }
-  };
-  
-  // Function to handle filter selection
-  const handleFilterSelect = (status: string | null) => {
-    setStatusFilter(status);
-  };
-
   return (
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white mb-1">Manage Orders</h1>
-          <p className="text-white/70">View and manage all user orders</p>
+          <p className="text-white/70">View and manage all orders</p>
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 space-y-4 sm:space-y-0">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 space-y-4 sm:space-y-0 sm:space-x-4">
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
           <Input
@@ -130,31 +135,20 @@ const AdminOrders = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex items-center space-x-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <CustomButton variant="outline" size="sm">
-                <Filter className="h-4 w-4 mr-2" /> Filter: {statusFilter || 'All'}
-              </CustomButton>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleFilterSelect(null)}>
-                All
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleFilterSelect('pending')}>
-                Pending
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleFilterSelect('processing')}>
-                Processing
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleFilterSelect('shipping')}>
-                Shipping
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleFilterSelect('completed')}>
-                Completed
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div className="w-full sm:w-48">
+          <Select onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Statuses</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="processing">Processing</SelectItem>
+              <SelectItem value="shipped">Shipped</SelectItem>
+              <SelectItem value="delivered">Delivered</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -162,13 +156,12 @@ const AdminOrders = () => {
         <div className="flex justify-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-groop-blue"></div>
         </div>
-      ) : filteredOrders.length === 0 ? (
+      ) : !orders ? (
         <Card className="glass">
           <CardContent className="py-10 text-center">
-            <Package className="h-12 w-12 text-white/30 mx-auto mb-3" />
             <h3 className="text-lg font-medium text-white mb-1">No orders found</h3>
             <p className="text-white/70 mb-4">
-              {searchTerm || statusFilter ? "No orders match your filter criteria" : "There are no orders in the system"}
+              {searchTerm ? "No orders match your search criteria" : "There are no orders in the system"}
             </p>
           </CardContent>
         </Card>
@@ -182,24 +175,22 @@ const AdminOrders = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Order ID</TableHead>
                   <TableHead>Title</TableHead>
-                  <TableHead>User ID</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Volume</TableHead>
+                  <TableHead>Created At</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredOrders.map((order) => (
                   <TableRow key={order.id}>
-                    <TableCell className="font-medium">{order.title}</TableCell>
-                    <TableCell>{order.user_id}</TableCell>
+                    <TableCell className="font-medium">{order.id}</TableCell>
+                    <TableCell>{order.title}</TableCell>
                     <TableCell>
-                      <Badge className={getStatusColor(order.status)}>{order.status}</Badge>
+                      <Badge>{order.status}</Badge>
                     </TableCell>
                     <TableCell>{formatDate(order.created_at)}</TableCell>
-                    <TableCell>{order.total_volume ? `${order.total_volume} m³` : '-'}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -209,13 +200,17 @@ const AdminOrders = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewOrder(order.id)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Details
+                          <DropdownMenuItem>
+                            <Copy className="mr-2 h-4 w-4" />
+                            Copy Order ID
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteOrder(order.id)}>
-                            <Trash className="mr-2 h-4 w-4" />
-                            Delete
+                          <DropdownMenuItem>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit Order
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-red-500 focus:text-red-500">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete Order
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>

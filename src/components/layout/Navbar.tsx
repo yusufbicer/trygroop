@@ -1,203 +1,93 @@
-
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Menu, X, MessageCircle } from 'lucide-react';
-import { CustomButton } from '../ui/CustomButton';
+import React from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 
-const Navbar = () => {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, signOut } = useAuth();
+const Navbar: React.FC = () => {
+  const { user, profile, signOut, loading } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
-  useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 10) {
-        setIsScrolled(true);
-      } else {
-        setIsScrolled(false);
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, []);
-
-  const handleChatClick = () => {
-    // This will be replaced with WhatsApp functionality later
-    alert('Chat functionality will be implemented later');
-  };
-
-  const scrollToSection = (sectionId: string) => {
-    const section = document.getElementById(sectionId);
-    setIsMobileMenuOpen(false);
-    
-    if (section) {
-      section.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
+  const navItems = [
+  { label: 'Home', href: '/' },
+  { label: 'Blog', href: '/blog' },
+  { label: 'Pricing', href: '/#pricing' },
+  { label: 'Contact', href: '/#contact' },
+];
 
   return (
-    <nav
-      className={`fixed w-full z-50 transition-all duration-300 ${
-        isScrolled ? 'bg-groop-darker/80 backdrop-blur-lg shadow-md' : 'bg-transparent'
-      }`}
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16 items-center">
-          <div className="flex items-center">
-            <Link to="/" className="flex items-center gap-2">
-              <span className="text-groop-blue font-bold text-2xl">Groop</span>
-            </Link>
-          </div>
-
-          {/* Desktop navigation */}
-          <div className="hidden md:block">
-            <div className="flex items-center space-x-8">
-              <Link to="/" className="text-white/80 hover:text-white transition-colors">
-                Home
+    <nav className="bg-groop-darker py-4">
+      <div className="container mx-auto flex items-center justify-between">
+        <Link to="/" className="text-2xl font-bold text-white">
+          Groop
+        </Link>
+        <ul className="flex items-center space-x-6">
+          {navItems.map((item) => (
+            <li key={item.label}>
+              <Link to={item.href} className="text-white hover:text-groop-blue">
+                {item.label}
               </Link>
-              <button 
-                onClick={() => scrollToSection('features')} 
-                className="text-white/80 hover:text-white transition-colors"
-              >
-                Features
-              </button>
-              <button 
-                onClick={() => scrollToSection('how-it-works')} 
-                className="text-white/80 hover:text-white transition-colors"
-              >
-                How It Works
-              </button>
-              {/* Update blog link to go to blog page instead of section */}
-              <Link 
-                to="/blog" 
-                className="text-white/80 hover:text-white transition-colors"
-              >
-                Blog
+            </li>
+          ))}
+          {user ? (
+            <li>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="h-8 w-8 p-0">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={profile?.avatar_url || `https://api.dicebear.com/7.x/pixel-art/svg?seed=${user.email}`} alt={profile?.first_name || "Avatar"} />
+                      <AvatarFallback>{profile?.first_name?.charAt(0).toUpperCase() || profile?.last_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate('/dashboard')}>Dashboard</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/profile')}>Profile</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/admin/orders')}>Admin</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={async () => {
+                    try {
+                      await signOut();
+                      navigate('/auth');
+                      toast({
+                        title: "Signed out",
+                        description: "You have been successfully signed out."
+                      });
+                    } catch (error) {
+                      toast({
+                        variant: "destructive",
+                        title: "Oh no! Something went wrong.",
+                        description: "There was a problem signing you out. Please try again."
+                      });
+                    }
+                  }} disabled={loading}>
+                    {loading ? 'Signing Out...' : 'Sign out'}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </li>
+          ) : (
+            <li>
+              <Link to="/auth">
+                <Button>Sign In</Button>
               </Link>
-              <button
-                onClick={handleChatClick}
-                className="text-white/80 hover:text-white transition-colors flex items-center"
-              >
-                <MessageCircle className="h-5 w-5 mr-1" />
-                Chat with us
-              </button>
-              {user ? (
-                <>
-                  <Link to="/dashboard">
-                    <CustomButton variant="secondary" size="sm">
-                      Dashboard
-                    </CustomButton>
-                  </Link>
-                  <CustomButton variant="outline" size="sm" onClick={() => signOut()}>
-                    Sign Out
-                  </CustomButton>
-                </>
-              ) : (
-                <Link to="/auth">
-                  <CustomButton variant="primary" size="sm" isGlowing>
-                    Get Started
-                  </CustomButton>
-                </Link>
-              )}
-            </div>
-          </div>
-
-          {/* Mobile menu button */}
-          <div className="md:hidden flex items-center space-x-3">
-            <button
-              onClick={handleChatClick}
-              className="text-white hover:text-groop-blue focus:outline-none"
-            >
-              <MessageCircle className="h-5 w-5" />
-            </button>
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="text-white hover:text-groop-blue focus:outline-none"
-            >
-              {isMobileMenuOpen ? (
-                <X className="h-6 w-6" />
-              ) : (
-                <Menu className="h-6 w-6" />
-              )}
-            </button>
-          </div>
-        </div>
+            </li>
+          )}
+        </ul>
       </div>
-
-      {/* Mobile menu */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden bg-groop-dark glass animate-fade-in">
-          <div className="px-4 pt-2 pb-4 space-y-3">
-            <Link
-              to="/"
-              className="block py-2 text-white hover:text-groop-blue"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Home
-            </Link>
-            <button
-              onClick={() => scrollToSection('features')}
-              className="block w-full text-left py-2 text-white hover:text-groop-blue"
-            >
-              Features
-            </button>
-            <button
-              onClick={() => scrollToSection('how-it-works')}
-              className="block w-full text-left py-2 text-white hover:text-groop-blue"
-            >
-              How It Works
-            </button>
-            {/* Update mobile blog link */}
-            <Link
-              to="/blog"
-              className="block py-2 text-white hover:text-groop-blue"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Blog
-            </Link>
-            <div className="flex flex-col gap-3 pt-2">
-              {user ? (
-                <>
-                  <Link to="/dashboard">
-                    <CustomButton
-                      variant="secondary"
-                      className="w-full"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Dashboard
-                    </CustomButton>
-                  </Link>
-                  <CustomButton
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      signOut();
-                      setIsMobileMenuOpen(false);
-                    }}
-                  >
-                    Sign Out
-                  </CustomButton>
-                </>
-              ) : (
-                <Link to="/auth">
-                  <CustomButton
-                    variant="primary"
-                    className="w-full"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Get Started
-                  </CustomButton>
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </nav>
   );
 };
