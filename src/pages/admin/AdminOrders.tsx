@@ -33,7 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Copy, Edit, Trash2, File, AlertCircle, RefreshCw } from 'lucide-react';
+import { MoreHorizontal, Copy, Edit, Trash2, File, AlertCircle, RefreshCw, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Search } from 'lucide-react';
 import { Label } from '@/components/ui/label';
@@ -66,6 +66,13 @@ const AdminOrders = () => {
   const [debugInfo, setDebugInfo] = useState<any>(null);
   const { toast } = useToast();
   const { isAdmin, user } = useAuth();
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [newOrder, setNewOrder] = useState({
+    title: '',
+    status: 'pending',
+    details: '',
+    total_volume: 0
+  });
 
   useEffect(() => {
     if (isAdmin && user) {
@@ -82,37 +89,29 @@ const AdminOrders = () => {
     setDebugInfo(null);
     
     try {
-      // First, check if the orders table exists and is accessible
-      const { data: tableInfo, error: tableError } = await supabase
-        .from('orders')
-        .select('count(*)', { count: 'exact', head: true });
+      console.log("Fetching orders...");
       
-      if (tableError) {
-        console.error('Error checking orders table:', tableError);
-        setDebugInfo({ tableCheck: tableError });
-        throw new Error(`Table access error: ${tableError.message}`);
-      }
-      
-      // Now fetch the actual orders
+      // First, check if the orders table exists by trying to select from it
       const { data, error } = await supabase
         .from('orders')
         .select('*')
         .order('created_at', { ascending: false });
-
+      
       if (error) {
         console.error('Error fetching orders:', error);
         setDebugInfo({ fetchError: error });
+        
+        // If the table doesn't exist, create it
+        if (error.code === '42P01') { // Table doesn't exist error
+          await createOrdersTable();
+          return;
+        }
+        
         throw error;
       }
 
-      if (!data || data.length === 0) {
-        // No error but no data either - this is not an error state
-        console.log('No orders found in the database');
-        setOrders([]);
-      } else {
-        console.log(`Successfully fetched ${data.length} orders`);
-        setOrders(data);
-      }
+      console.log(`Successfully fetched ${data?.length || 0} orders`);
+      setOrders(data || []);
     } catch (error: any) {
       console.error('Error in orders fetch operation:', error);
       setError(error.message || 'Failed to fetch orders');
@@ -123,6 +122,79 @@ const AdminOrders = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const createOrdersTable = async () => {
+    try {
+      console.log("Creating orders table...");
+      
+      // This is a simplified approach - in a production app, you'd use migrations
+      const { error } = await supabase.rpc('create_orders_table');
+      
+      if (error) {
+        console.error('Error creating orders table:', error);
+        setError(`Failed to create orders table: ${error.message}`);
+        return;
+      }
+      
+      console.log("Orders table created successfully");
+      toast({
+        title: 'Success',
+        description: 'Orders table created successfully. You can now add orders.',
+        duration: 5000,
+      });
+      
+      setOrders([]);
+    } catch (error: any) {
+      console.error('Error creating orders table:', error);
+      setError(`Failed to create orders table: ${error.message}`);
+    }
+  };
+
+  const createOrder = async () => {
+    try {
+      if (!user) {
+        throw new Error('You must be logged in to create an order');
+      }
+      
+      const { data, error } = await supabase
+        .from('orders')
+        .insert([
+          {
+            title: newOrder.title,
+            status: newOrder.status,
+            details: newOrder.details || null,
+            total_volume: newOrder.total_volume || null,
+            user_id: user.id
+          }
+        ])
+        .select();
+      
+      if (error) throw error;
+      
+      toast({
+        title: 'Success',
+        description: 'Order created successfully',
+      });
+      
+      setShowCreateDialog(false);
+      setNewOrder({
+        title: '',
+        status: 'pending',
+        details: '',
+        total_volume: 0
+      });
+      
+      // Refresh orders list
+      fetchOrders();
+    } catch (error: any) {
+      console.error('Error creating order:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to create order',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -180,16 +252,25 @@ const AdminOrders = () => {
           <h1 className="text-2xl font-bold text-white mb-1">Manage Orders</h1>
           <p className="text-white/70">View and manage all orders</p>
         </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={fetchOrders} 
-          disabled={isLoading}
-          className="mt-4 sm:mt-0"
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex gap-2 mt-4 sm:mt-0">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={fetchOrders} 
+            disabled={isLoading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button 
+            variant="default" 
+            size="sm" 
+            onClick={() => setShowCreateDialog(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Order
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -239,7 +320,7 @@ const AdminOrders = () => {
             <p className="text-white/70 mb-4">
               {searchTerm || statusFilter 
                 ? "No orders match your search criteria" 
-                : "There are no orders in the system yet"}
+                : "There are no orders in the system yet. Click 'Create Order' to add one."}
             </p>
             {debugInfo && (
               <div className="mt-4 p-4 bg-black/20 rounded text-left text-xs overflow-auto max-h-40">
@@ -314,6 +395,79 @@ const AdminOrders = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Create Order Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Order</DialogTitle>
+            <DialogDescription>
+              Add a new order to the system. Fill out the details below.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Order Title</Label>
+              <Input
+                id="title"
+                placeholder="Enter order title"
+                value={newOrder.title}
+                onChange={(e) => setNewOrder({...newOrder, title: e.target.value})}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select 
+                value={newOrder.status} 
+                onValueChange={(value) => setNewOrder({...newOrder, status: value})}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="processing">Processing</SelectItem>
+                  <SelectItem value="shipped">Shipped</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="details">Details (Optional)</Label>
+              <Input
+                id="details"
+                placeholder="Enter order details"
+                value={newOrder.details}
+                onChange={(e) => setNewOrder({...newOrder, details: e.target.value})}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="volume">Volume (m³)</Label>
+              <Input
+                id="volume"
+                type="number"
+                placeholder="Enter volume in cubic meters"
+                value={newOrder.total_volume.toString()}
+                onChange={(e) => setNewOrder({...newOrder, total_volume: parseFloat(e.target.value) || 0})}
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={createOrder} disabled={!newOrder.title}>
+              Create Order
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

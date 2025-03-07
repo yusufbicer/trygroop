@@ -16,6 +16,7 @@ type AuthContextType = {
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
   refreshSession: () => Promise<void>;
+  makeAdmin: (userId: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -79,6 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const checkAdminRole = async (userId: string) => {
     try {
+      // First, check if user_roles table exists by trying to select from it
       const { data, error } = await supabase
         .from('user_roles')
         .select('*')
@@ -87,13 +89,91 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .maybeSingle();
 
       if (error) {
+        // If the table doesn't exist, check if this is the first user
+        if (error.code === '42P01') { // Table doesn't exist error
+          console.log('user_roles table does not exist, checking if first user');
+          await checkFirstUser(userId);
+          return;
+        }
+        
         console.error('Error checking admin role:', error);
         return;
       }
 
       setIsAdmin(!!data);
+      
+      // If no admin role found, check if this is the first user
+      if (!data) {
+        await checkFirstUser(userId);
+      }
     } catch (error) {
       console.error('Error checking admin role:', error);
+    }
+  };
+  
+  const checkFirstUser = async (userId: string) => {
+    try {
+      // Check if this is the first user by counting profiles
+      const { count, error } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+      
+      if (error) {
+        console.error('Error counting profiles:', error);
+        return;
+      }
+      
+      // If this is the first or only user, make them an admin
+      if (count === 1) {
+        console.log('First user detected, making admin');
+        await makeAdmin(userId);
+        setIsAdmin(true);
+      }
+    } catch (error) {
+      console.error('Error checking if first user:', error);
+    }
+  };
+  
+  const makeAdmin = async (userId: string) => {
+    try {
+      // First try to create the user_roles table if it doesn't exist
+      try {
+        await supabase.rpc('create_orders_table'); // This also creates user_roles table
+      } catch (error) {
+        console.error('Error creating tables:', error);
+        // Continue anyway, as the table might already exist
+      }
+      
+      // Insert admin role for the user
+      const { error } = await supabase
+        .from('user_roles')
+        .upsert([
+          { user_id: userId, role: 'admin' }
+        ]);
+      
+      if (error) {
+        if (error.code === '23505') { // Unique violation - role already exists
+          console.log('User already has admin role');
+          setIsAdmin(true);
+          return;
+        }
+        throw error;
+      }
+      
+      console.log('Admin role assigned successfully');
+      setIsAdmin(true);
+      
+      toast({
+        title: 'Admin Access Granted',
+        description: 'You now have administrator privileges.',
+      });
+    } catch (error: any) {
+      console.error('Error making user admin:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to assign admin role: ${error.message}`,
+        variant: 'destructive',
+      });
     }
   };
 
@@ -224,6 +304,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signOut,
         updateProfile,
         refreshSession,
+        makeAdmin,
       }}
     >
       {children}
