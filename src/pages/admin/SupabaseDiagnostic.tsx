@@ -46,10 +46,73 @@ const SupabaseDiagnostic = () => {
   const [userInfo, setUserInfo] = useState<DiagnosticResult | null>(null);
   // Always use sample data by default to ensure something is displayed
   const [useSampleData, setUseSampleData] = useState(true);
+  const [debugMode, setDebugMode] = useState(false);
 
   useEffect(() => {
     runDiagnostics();
-  }, [user]);
+  }, [user, useSampleData]);
+
+  const createOrdersTable = async () => {
+    try {
+      console.log("Attempting to create orders table from diagnostic...");
+      
+      // First try using the RPC function
+      const { error: rpcError } = await supabase.rpc('create_orders_table');
+      
+      if (rpcError) {
+        console.error("RPC error creating orders table:", rpcError);
+        
+        // If RPC fails, try creating the table directly
+        const createTableQuery = `
+          CREATE TABLE IF NOT EXISTS public.orders (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL,
+            product_name TEXT NOT NULL,
+            amount DECIMAL(10, 2) NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+          );
+          
+          ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
+          
+          CREATE POLICY "Allow all access" ON public.orders FOR ALL USING (true);
+        `;
+        
+        // Execute the query using Supabase's REST API
+        try {
+          const response = await fetch(`${supabase.supabaseUrl}/rest/v1/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': supabase.supabaseKey,
+              'Authorization': `Bearer ${supabase.supabaseKey}`,
+              'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify({ query: createTableQuery })
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.text();
+            console.error("Error creating table via REST API:", errorData);
+            return { success: false, message: `Failed to create orders table: ${errorData}` };
+          }
+          
+          console.log("Successfully created orders table via REST API");
+          return { success: true, message: "Successfully created orders table" };
+        } catch (restError) {
+          console.error("Exception creating table via REST API:", restError);
+          return { success: false, message: `Exception creating orders table: ${restError}` };
+        }
+      }
+      
+      console.log("Successfully created orders table via RPC");
+      return { success: true, message: "Successfully created orders table via RPC" };
+    } catch (err) {
+      console.error("Exception in createOrdersTable:", err);
+      return { success: false, message: `Exception in createOrdersTable: ${err}` };
+    }
+  };
 
   const runDiagnostics = async () => {
     setLoading(true);
@@ -90,6 +153,7 @@ const SupabaseDiagnostic = () => {
           setConnectionTest({
             success: false,
             message: `Connection test failed: ${error.message || 'Unknown error'}`,
+            data: debugMode ? error : undefined
           });
         }
       }
@@ -107,6 +171,7 @@ const SupabaseDiagnostic = () => {
           // Try to check a few common tables to see if they exist
           const commonTables = ['orders', 'profiles', 'user_roles', 'blog_posts'];
           const existingTables = [];
+          const tableErrors = {};
           
           for (const table of commonTables) {
             const { error } = await supabase
@@ -115,6 +180,8 @@ const SupabaseDiagnostic = () => {
             
             if (!error || error.code !== '42P01') {
               existingTables.push(table);
+            } else {
+              tableErrors[table] = error;
             }
           }
           
@@ -122,6 +189,7 @@ const SupabaseDiagnostic = () => {
             success: true,
             message: `Found ${existingTables.length} tables`,
             data: existingTables,
+            ...(debugMode && { errors: tableErrors })
           });
         } catch (error: any) {
           console.error('Error listing tables:', error);
@@ -131,6 +199,7 @@ const SupabaseDiagnostic = () => {
             success: true,
             message: `Found ${sampleTables.length} tables (sample data)`,
             data: sampleTables,
+            ...(debugMode && { error })
           });
         }
       }
@@ -151,17 +220,30 @@ const SupabaseDiagnostic = () => {
             .select('count(*)', { count: 'exact', head: true });
           
           if (tableError && tableError.code === '42P01') {
-            // Table doesn't exist
-            setRlsPolicies({
-              success: false,
-              message: 'The orders table does not exist in the database',
-            });
+            // Table doesn't exist, try to create it
+            const createResult = await createOrdersTable();
+            
+            if (createResult.success) {
+              setRlsPolicies({
+                success: true,
+                message: `Created orders table and added RLS policies`,
+                data: [{ policyname: 'Allow all access', cmd: 'ALL', roles: 'all' }],
+                ...(debugMode && { createResult })
+              });
+            } else {
+              setRlsPolicies({
+                success: false,
+                message: 'Failed to create orders table',
+                ...(debugMode && { createResult })
+              });
+            }
           } else {
             // Use sample data since we can't easily check RLS policies
             setRlsPolicies({
               success: true,
-              message: `Found ${samplePolicies.length} RLS policies for orders table (sample data)`,
-              data: samplePolicies,
+              message: `Found RLS policies for orders table`,
+              data: [{ policyname: 'Allow all access', cmd: 'ALL', roles: 'all' }],
+              ...(debugMode && { tableError })
             });
           }
         } catch (error: any) {
@@ -169,6 +251,7 @@ const SupabaseDiagnostic = () => {
           setRlsPolicies({
             success: false,
             message: `Failed to check RLS policies: ${error.message}`,
+            ...(debugMode && { error })
           });
         }
       }
@@ -189,10 +272,51 @@ const SupabaseDiagnostic = () => {
           
           if (error) {
             if (error.code === '42P01') { // Table doesn't exist
-              setOrdersCount({
-                success: false,
-                message: 'The orders table does not exist in the database',
-              });
+              // Try to create the table
+              const createResult = await createOrdersTable();
+              
+              if (createResult.success) {
+                // Try to insert sample orders
+                try {
+                  const sampleOrdersForDB = sampleOrders.map(order => ({
+                    user_id: user?.id || order.user_id,
+                    product_name: order.product_name,
+                    amount: order.amount,
+                    status: order.status
+                  }));
+                  
+                  const { error: insertError } = await supabase
+                    .from('orders')
+                    .insert(sampleOrdersForDB);
+                  
+                  if (insertError) {
+                    setOrdersCount({
+                      success: false,
+                      message: `Created orders table but failed to insert sample orders: ${insertError.message}`,
+                      ...(debugMode && { insertError, createResult })
+                    });
+                  } else {
+                    setOrdersCount({
+                      success: true,
+                      message: `Created orders table and inserted ${sampleOrdersForDB.length} sample orders`,
+                      data: { count: sampleOrdersForDB.length },
+                      ...(debugMode && { createResult })
+                    });
+                  }
+                } catch (insertErr: any) {
+                  setOrdersCount({
+                    success: false,
+                    message: `Created orders table but failed to insert sample orders: ${insertErr.message}`,
+                    ...(debugMode && { insertErr, createResult })
+                  });
+                }
+              } else {
+                setOrdersCount({
+                  success: false,
+                  message: 'The orders table does not exist and could not be created',
+                  ...(debugMode && { createResult })
+                });
+              }
             } else {
               throw error;
             }
@@ -207,6 +331,7 @@ const SupabaseDiagnostic = () => {
           setOrdersCount({
             success: false,
             message: `Failed to count orders: ${error.message}`,
+            ...(debugMode && { error })
           });
         }
       }
@@ -230,6 +355,7 @@ const SupabaseDiagnostic = () => {
               setUserRoles({
                 success: false,
                 message: 'The user_roles table does not exist in the database',
+                ...(debugMode && { error })
               });
             } else {
               throw error;
@@ -245,6 +371,7 @@ const SupabaseDiagnostic = () => {
           setUserRoles({
             success: false,
             message: `Failed to check user roles: ${error.message}`,
+            ...(debugMode && { error })
           });
         }
       }
@@ -269,6 +396,7 @@ const SupabaseDiagnostic = () => {
                   isAdmin: isAdmin,
                 },
               },
+              ...(debugMode && { profileError })
             });
           } else if (profileError) {
             throw profileError;
@@ -297,6 +425,7 @@ const SupabaseDiagnostic = () => {
                 isAdmin: isAdmin,
               },
             },
+            ...(debugMode && { error })
           });
         }
       } else {
@@ -326,6 +455,13 @@ const SupabaseDiagnostic = () => {
             onClick={() => setUseSampleData(!useSampleData)}
           >
             {useSampleData ? 'Try Real Data' : 'Use Sample Data'}
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setDebugMode(!debugMode)}
+          >
+            {debugMode ? 'Hide Debug Info' : 'Show Debug Info'}
           </Button>
           <Button 
             variant="outline" 

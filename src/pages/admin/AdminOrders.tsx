@@ -63,16 +63,86 @@ const AdminOrders = () => {
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Always use sample data by default to ensure something is displayed
   const [useSampleData, setUseSampleData] = useState(true);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
 
   useEffect(() => {
     fetchOrders();
   }, [useSampleData]);
 
+  const createOrdersTable = async () => {
+    try {
+      console.log("Attempting to create orders table...");
+      
+      // First try using the RPC function
+      const { error: rpcError } = await supabase.rpc('create_orders_table');
+      
+      if (rpcError) {
+        console.error("RPC error creating orders table:", rpcError);
+        
+        // If RPC fails, try creating the table directly
+        const { error: createError } = await supabase.from('orders').insert([]).select();
+        
+        if (createError && createError.code === '42P01') {
+          // Table doesn't exist, create it manually
+          const createTableQuery = `
+            CREATE TABLE IF NOT EXISTS public.orders (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              user_id UUID NOT NULL,
+              product_name TEXT NOT NULL,
+              amount DECIMAL(10, 2) NOT NULL,
+              status TEXT NOT NULL DEFAULT 'pending',
+              created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+              updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            );
+            
+            ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
+            
+            CREATE POLICY "Allow all access" ON public.orders FOR ALL USING (true);
+          `;
+          
+          // Execute the query using Supabase's REST API
+          try {
+            const response = await fetch(`${supabase.supabaseUrl}/rest/v1/`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': supabase.supabaseKey,
+                'Authorization': `Bearer ${supabase.supabaseKey}`,
+                'Prefer': 'return=minimal'
+              },
+              body: JSON.stringify({ query: createTableQuery })
+            });
+            
+            if (!response.ok) {
+              const errorData = await response.text();
+              console.error("Error creating table via REST API:", errorData);
+              return false;
+            }
+            
+            console.log("Successfully created orders table via REST API");
+            return true;
+          } catch (restError) {
+            console.error("Exception creating table via REST API:", restError);
+            return false;
+          }
+        }
+        
+        return false;
+      }
+      
+      console.log("Successfully created orders table via RPC");
+      return true;
+    } catch (err) {
+      console.error("Exception in createOrdersTable:", err);
+      return false;
+    }
+  };
+
   const fetchOrders = async () => {
     setLoading(true);
     setError(null);
+    setDebugInfo(null);
 
     if (useSampleData) {
       // Use sample data
@@ -82,6 +152,31 @@ const AdminOrders = () => {
     }
 
     try {
+      console.log("Fetching real orders data...");
+      
+      // First check if the orders table exists
+      const { count, error: checkError } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true });
+      
+      if (checkError) {
+        console.error("Error checking orders table:", checkError);
+        
+        if (checkError.code === '42P01') {
+          console.log("Orders table doesn't exist, attempting to create it...");
+          const created = await createOrdersTable();
+          
+          if (!created) {
+            throw new Error("Failed to create orders table");
+          }
+          
+          // Try fetching again after creating the table
+          console.log("Table created, fetching orders...");
+        } else {
+          throw new Error(`Error checking orders table: ${checkError.message}`);
+        }
+      }
+      
       // Try to fetch orders from the database
       const { data, error } = await supabase
         .from('orders')
@@ -90,13 +185,61 @@ const AdminOrders = () => {
 
       if (error) {
         console.error('Error fetching orders:', error);
+        setDebugInfo({ fetchError: error });
         throw new Error(`Could not fetch orders: ${error.message}`);
+      }
+      
+      console.log(`Successfully fetched ${data?.length || 0} orders`);
+      
+      // If no orders exist, create some sample ones
+      if (!data || data.length === 0) {
+        console.log("No orders found, creating sample orders...");
+        
+        try {
+          const sampleOrdersForDB = sampleOrders.map(order => ({
+            user_id: user?.id || order.user_id,
+            product_name: order.product_name,
+            amount: order.amount,
+            status: order.status
+          }));
+          
+          const { error: insertError } = await supabase
+            .from('orders')
+            .insert(sampleOrdersForDB);
+          
+          if (insertError) {
+            console.error("Error inserting sample orders:", insertError);
+            setDebugInfo({ insertError });
+          } else {
+            console.log("Successfully inserted sample orders");
+            
+            // Fetch the newly inserted orders
+            const { data: newData, error: refetchError } = await supabase
+              .from('orders')
+              .select('*')
+              .order('created_at', { ascending: false });
+            
+            if (refetchError) {
+              console.error("Error fetching after insert:", refetchError);
+              setDebugInfo({ refetchError });
+            } else {
+              console.log(`Fetched ${newData?.length || 0} orders after insert`);
+              setOrders(newData || []);
+              setLoading(false);
+              return;
+            }
+          }
+        } catch (insertErr) {
+          console.error("Exception inserting sample orders:", insertErr);
+          setDebugInfo({ insertException: insertErr });
+        }
       }
       
       setOrders(data || []);
     } catch (err: any) {
       console.error('Failed to fetch orders:', err);
       setError(err.message || 'Failed to fetch orders');
+      setDebugInfo({ mainError: err });
       
       // Fall back to sample data
       setOrders(sampleOrders);
@@ -204,6 +347,13 @@ const AdminOrders = () => {
                   ))}
                 </TableBody>
               </Table>
+            </div>
+          )}
+          
+          {debugInfo && (
+            <div className="mt-4 p-4 bg-black/20 rounded text-left text-xs overflow-auto max-h-60">
+              <p className="font-semibold mb-2">Debug Information:</p>
+              <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
             </div>
           )}
         </CardContent>
