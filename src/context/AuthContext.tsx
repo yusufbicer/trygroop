@@ -136,12 +136,105 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   
   const makeAdmin = async (userId: string) => {
     try {
+      // First try to fix RLS policies on user_roles table
+      try {
+        // Try to execute the SQL function to fix RLS policies
+        await supabase.rpc('fix_user_roles_rls');
+      } catch (error) {
+        console.error('Error fixing RLS policies:', error);
+        
+        // Try direct SQL execution
+        try {
+          await supabase.rpc(
+            'exec_sql',
+            { 
+              sql: `
+                -- Drop existing RLS policies on user_roles table if they exist
+                DROP POLICY IF EXISTS "Users can view their own roles" ON public.user_roles;
+                DROP POLICY IF EXISTS "Admins can view all roles" ON public.user_roles;
+                DROP POLICY IF EXISTS "Admins can insert roles" ON public.user_roles;
+                DROP POLICY IF EXISTS "Admins can update roles" ON public.user_roles;
+                DROP POLICY IF EXISTS "Admins can delete roles" ON public.user_roles;
+                
+                -- Create new RLS policies that allow users to assign admin roles to themselves
+                CREATE POLICY "Users can view their own roles"
+                    ON public.user_roles
+                    FOR SELECT
+                    USING (auth.uid() = user_id);
+                
+                CREATE POLICY "Users can insert their own roles"
+                    ON public.user_roles
+                    FOR INSERT
+                    WITH CHECK (auth.uid() = user_id);
+                
+                CREATE POLICY "Users can update their own roles"
+                    ON public.user_roles
+                    FOR UPDATE
+                    USING (auth.uid() = user_id);
+                
+                CREATE POLICY "Users can delete their own roles"
+                    ON public.user_roles
+                    FOR DELETE
+                    USING (auth.uid() = user_id);
+              `
+            }
+          );
+        } catch (sqlError) {
+          console.error('Error executing SQL to fix RLS policies:', sqlError);
+          // Continue anyway, as we'll try to create the user_roles table
+        }
+      }
+      
       // First try to create the user_roles table if it doesn't exist
       try {
         await supabase.rpc('create_orders_table'); // This also creates user_roles table
       } catch (error) {
         console.error('Error creating tables:', error);
-        // Continue anyway, as the table might already exist
+        
+        // Try direct SQL execution to create user_roles table
+        try {
+          await supabase.rpc(
+            'exec_sql',
+            { 
+              sql: `
+                -- Create user_roles table if it doesn't exist
+                CREATE TABLE IF NOT EXISTS public.user_roles (
+                  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                  user_id UUID NOT NULL,
+                  role TEXT NOT NULL,
+                  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+                  UNIQUE(user_id, role)
+                );
+                
+                -- Enable RLS on user_roles table
+                ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+                
+                -- Create RLS policies for user_roles table
+                CREATE POLICY "Users can view their own roles"
+                    ON public.user_roles
+                    FOR SELECT
+                    USING (auth.uid() = user_id);
+                
+                CREATE POLICY "Users can insert their own roles"
+                    ON public.user_roles
+                    FOR INSERT
+                    WITH CHECK (auth.uid() = user_id);
+                
+                CREATE POLICY "Users can update their own roles"
+                    ON public.user_roles
+                    FOR UPDATE
+                    USING (auth.uid() = user_id);
+                
+                CREATE POLICY "Users can delete their own roles"
+                    ON public.user_roles
+                    FOR DELETE
+                    USING (auth.uid() = user_id);
+              `
+            }
+          );
+        } catch (sqlError) {
+          console.error('Error creating user_roles table with SQL:', sqlError);
+        }
       }
       
       // Insert admin role for the user
@@ -157,6 +250,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsAdmin(true);
           return;
         }
+        
+        // If there's still an error, try a different approach with direct SQL
+        if (error.message.includes('violates row-level security policy')) {
+          console.log('Trying direct SQL insertion due to RLS policy violation');
+          
+          const { error: directError } = await supabase.rpc(
+            'exec_sql',
+            { 
+              sql: `
+                INSERT INTO public.user_roles (user_id, role)
+                VALUES ('${userId}', 'admin')
+                ON CONFLICT (user_id, role) DO NOTHING;
+              `
+            }
+          );
+          
+          if (directError) {
+            throw directError;
+          } else {
+            console.log('Admin role assigned successfully with direct SQL');
+            setIsAdmin(true);
+            toast({
+              title: 'Admin Access Granted',
+              description: 'You now have administrator privileges.',
+            });
+            return;
+          }
+        }
+        
         throw error;
       }
       

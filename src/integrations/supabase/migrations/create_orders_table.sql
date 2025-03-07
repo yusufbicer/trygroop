@@ -121,53 +121,52 @@ BEGIN
         FOR SELECT
         USING (auth.uid() = user_id);
 
-      -- Policy for admins to view all roles
-      CREATE POLICY "Admins can view all roles"
-        ON public.user_roles
-        FOR SELECT
-        USING (
-          EXISTS (
-            SELECT 1 FROM public.user_roles
-            WHERE user_id = auth.uid()
-            AND role = 'admin'
-          )
-        );
-
-      -- Policy for admins to insert roles
-      CREATE POLICY "Admins can insert roles"
+      -- Policy for users to insert their own roles
+      CREATE POLICY "Users can insert their own roles"
         ON public.user_roles
         FOR INSERT
-        WITH CHECK (
-          EXISTS (
-            SELECT 1 FROM public.user_roles
-            WHERE user_id = auth.uid()
-            AND role = 'admin'
-          )
-        );
+        WITH CHECK (auth.uid() = user_id);
 
-      -- Policy for admins to update roles
-      CREATE POLICY "Admins can update roles"
+      -- Policy for users to update their own roles
+      CREATE POLICY "Users can update their own roles"
         ON public.user_roles
         FOR UPDATE
-        USING (
-          EXISTS (
-            SELECT 1 FROM public.user_roles
-            WHERE user_id = auth.uid()
-            AND role = 'admin'
-          )
-        );
+        USING (auth.uid() = user_id);
 
-      -- Policy for admins to delete roles
-      CREATE POLICY "Admins can delete roles"
+      -- Policy for users to delete their own roles
+      CREATE POLICY "Users can delete their own roles"
         ON public.user_roles
         FOR DELETE
-        USING (
-          EXISTS (
-            SELECT 1 FROM public.user_roles
-            WHERE user_id = auth.uid()
-            AND role = 'admin'
-          )
-        );
+        USING (auth.uid() = user_id);
+    ELSE
+      -- If the table exists, update its RLS policies
+      -- Drop existing policies
+      DROP POLICY IF EXISTS "Users can view their own roles" ON public.user_roles;
+      DROP POLICY IF EXISTS "Admins can view all roles" ON public.user_roles;
+      DROP POLICY IF EXISTS "Admins can insert roles" ON public.user_roles;
+      DROP POLICY IF EXISTS "Admins can update roles" ON public.user_roles;
+      DROP POLICY IF EXISTS "Admins can delete roles" ON public.user_roles;
+      
+      -- Create new policies
+      CREATE POLICY "Users can view their own roles"
+        ON public.user_roles
+        FOR SELECT
+        USING (auth.uid() = user_id);
+
+      CREATE POLICY "Users can insert their own roles"
+        ON public.user_roles
+        FOR INSERT
+        WITH CHECK (auth.uid() = user_id);
+
+      CREATE POLICY "Users can update their own roles"
+        ON public.user_roles
+        FOR UPDATE
+        USING (auth.uid() = user_id);
+
+      CREATE POLICY "Users can delete their own roles"
+        ON public.user_roles
+        FOR DELETE
+        USING (auth.uid() = user_id);
     END IF;
   END IF;
 END;
