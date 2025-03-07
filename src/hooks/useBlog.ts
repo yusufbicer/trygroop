@@ -46,9 +46,9 @@ export const useBlog = () => {
             .eq('post_id', post.id);
 
           const categories = categoriesData?.map(item => ({
-            id: item.blog_categories?.id,
-            name: item.blog_categories?.name,
-            slug: item.blog_categories?.slug
+            id: item.blog_categories ? item.blog_categories.id : null,
+            name: item.blog_categories ? item.blog_categories.name : null,
+            slug: item.blog_categories ? item.blog_categories.slug : null
           })) || [];
 
           // Fetch tags for each post
@@ -61,9 +61,9 @@ export const useBlog = () => {
             .eq('post_id', post.id);
 
           const tags = tagsData?.map(item => ({
-            id: item.blog_tags?.id,
-            name: item.blog_tags?.name,
-            slug: item.blog_tags?.slug
+            id: item.blog_tags ? item.blog_tags.id : null,
+            name: item.blog_tags ? item.blog_tags.name : null,
+            slug: item.blog_tags ? item.blog_tags.slug : null
           })) || [];
 
           return {
@@ -162,9 +162,9 @@ export const useAdminBlog = () => {
             .eq('post_id', post.id);
 
           const categories = categoriesData?.map(item => ({
-            id: item.blog_categories?.id,
-            name: item.blog_categories?.name,
-            slug: item.blog_categories?.slug
+            id: item.blog_categories ? item.blog_categories.id : null,
+            name: item.blog_categories ? item.blog_categories.name : null,
+            slug: item.blog_categories ? item.blog_categories.slug : null
           })) || [];
 
           // Fetch tags for each post
@@ -177,9 +177,9 @@ export const useAdminBlog = () => {
             .eq('post_id', post.id);
 
           const tags = tagsData?.map(item => ({
-            id: item.blog_tags?.id,
-            name: item.blog_tags?.name,
-            slug: item.blog_tags?.slug
+            id: item.blog_tags ? item.blog_tags.id : null,
+            name: item.blog_tags ? item.blog_tags.name : null,
+            slug: item.blog_tags ? item.blog_tags.slug : null
           })) || [];
 
           return {
@@ -256,8 +256,8 @@ export const useAdminBlog = () => {
           published: post.published,
           published_at: post.published_at,
           author_id: post.author_id,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          created_at: post.created_at || new Date().toISOString(),
+          updated_at: post.updated_at || new Date().toISOString()
         })
         .select()
         .single();
