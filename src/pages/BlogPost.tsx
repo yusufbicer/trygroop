@@ -37,9 +37,13 @@ const BlogPost = () => {
 
       // Fix the author_name extraction to work with the profiles object structure
       const profileData = data.profiles;
-      const authorName = profileData ? 
-        `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() : 
-        'Unknown';
+      let authorName = 'Unknown';
+      
+      if (profileData && typeof profileData === 'object') {
+        const firstName = profileData.first_name || '';
+        const lastName = profileData.last_name || '';
+        authorName = `${firstName} ${lastName}`.trim();
+      }
 
       return {
         ...data,

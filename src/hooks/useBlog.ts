@@ -48,15 +48,14 @@ export const useBlog = () => {
           const categories = categoriesData?.map(item => {
             // Check if blog_categories exists and is an object
             const categoryData = item.blog_categories;
-            return categoryData ? {
-              id: categoryData.id || null,
-              name: categoryData.name || null,
-              slug: categoryData.slug || null
-            } : {
-              id: null,
-              name: null,
-              slug: null
-            };
+            if (categoryData && typeof categoryData === 'object') {
+              return {
+                id: categoryData.id || null,
+                name: categoryData.name || null,
+                slug: categoryData.slug || null
+              };
+            }
+            return { id: null, name: null, slug: null };
           }) || [];
 
           // Fetch tags for each post
@@ -71,22 +70,25 @@ export const useBlog = () => {
           const tags = tagsData?.map(item => {
             // Check if blog_tags exists and is an object
             const tagData = item.blog_tags;
-            return tagData ? {
-              id: tagData.id || null,
-              name: tagData.name || null,
-              slug: tagData.slug || null
-            } : {
-              id: null,
-              name: null,
-              slug: null
-            };
+            if (tagData && typeof tagData === 'object') {
+              return {
+                id: tagData.id || null,
+                name: tagData.name || null,
+                slug: tagData.slug || null
+              };
+            }
+            return { id: null, name: null, slug: null };
           }) || [];
 
           // Safely access profiles data
           const profileData = post.profiles;
-          const authorName = profileData ? 
-            `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() : 
-            'Unknown';
+          let authorName = 'Unknown';
+          
+          if (profileData && typeof profileData === 'object') {
+            const firstName = profileData.first_name || '';
+            const lastName = profileData.last_name || '';
+            authorName = `${firstName} ${lastName}`.trim();
+          }
 
           return {
             ...post,
@@ -184,15 +186,14 @@ export const useAdminBlog = () => {
           const categories = categoriesData?.map(item => {
             // Check if blog_categories exists and is an object
             const categoryData = item.blog_categories;
-            return categoryData ? {
-              id: categoryData.id || null,
-              name: categoryData.name || null,
-              slug: categoryData.slug || null
-            } : {
-              id: null,
-              name: null,
-              slug: null
-            };
+            if (categoryData && typeof categoryData === 'object') {
+              return {
+                id: categoryData.id || null,
+                name: categoryData.name || null,
+                slug: categoryData.slug || null
+              };
+            }
+            return { id: null, name: null, slug: null };
           }) || [];
 
           // Fetch tags for each post
@@ -207,22 +208,25 @@ export const useAdminBlog = () => {
           const tags = tagsData?.map(item => {
             // Check if blog_tags exists and is an object
             const tagData = item.blog_tags;
-            return tagData ? {
-              id: tagData.id || null,
-              name: tagData.name || null,
-              slug: tagData.slug || null
-            } : {
-              id: null,
-              name: null,
-              slug: null
-            };
+            if (tagData && typeof tagData === 'object') {
+              return {
+                id: tagData.id || null,
+                name: tagData.name || null,
+                slug: tagData.slug || null
+              };
+            }
+            return { id: null, name: null, slug: null };
           }) || [];
 
           // Safely access profiles data
           const profileData = post.profiles;
-          const authorName = profileData ? 
-            `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() : 
-            'Unknown';
+          let authorName = 'Unknown';
+          
+          if (profileData && typeof profileData === 'object') {
+            const firstName = profileData.first_name || '';
+            const lastName = profileData.last_name || '';
+            authorName = `${firstName} ${lastName}`.trim();
+          }
 
           return {
             ...post,
