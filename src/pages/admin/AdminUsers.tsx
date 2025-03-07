@@ -8,6 +8,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,7 +27,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -34,10 +34,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Users, Search, MoreHorizontal, CheckCircle, XCircle, Shield, UserCog, Trash2 } from 'lucide-react';
+import { Users, Search, MoreHorizontal, CheckCircle, XCircle, Shield, Trash2, UserPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 
 interface UserData {
@@ -55,6 +54,14 @@ const AdminUsers = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isCreateUserDialogOpen, setIsCreateUserDialogOpen] = useState(false);
+  const [newUserForm, setNewUserForm] = useState({
+    email: '',
+    firstName: '',
+    lastName: '',
+    isAdmin: false,
+    password: '' // Note: In production, consider more secure approaches
+  });
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
 
@@ -86,9 +93,8 @@ const AdminUsers = () => {
         adminMap.set(role.user_id, true);
       });
 
-      // Step 3: Fetch auth.users data for emails
-      // Since we can't access auth data directly from client, we'll mock the emails
-      // but in a real app with server functions, you would get real emails
+      // Step 3: Fetch auth.users data for emails (using Supabase Edge Function or server API in production)
+      // For now, we'll use a placeholder approach
       const combinedUsers = profilesData.map(profile => ({
         ...profile,
         email: `user-${profile.id.substring(0, 8)}@example.com`, // Placeholder email
@@ -191,6 +197,61 @@ const AdminUsers = () => {
     }
   };
 
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      // In a production app, this would be handled by a secure server function
+      // For now, we'll simulate creating a user
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: newUserForm.email,
+        password: newUserForm.password,
+        options: {
+          data: {
+            first_name: newUserForm.firstName,
+            last_name: newUserForm.lastName
+          }
+        }
+      });
+
+      if (signUpError) throw signUpError;
+      
+      // If admin role is needed, add it
+      if (newUserForm.isAdmin && signUpData.user) {
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .insert({
+            user_id: signUpData.user.id,
+            role: 'admin'
+          });
+
+        if (roleError) throw roleError;
+      }
+
+      toast({
+        title: 'User created',
+        description: 'The new user has been added to the system',
+      });
+
+      setIsCreateUserDialogOpen(false);
+      setNewUserForm({
+        email: '',
+        firstName: '',
+        lastName: '',
+        isAdmin: false,
+        password: ''
+      });
+      
+      fetchUsers();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to create user',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
@@ -198,6 +259,13 @@ const AdminUsers = () => {
           <h1 className="text-2xl font-bold text-white mb-1">Manage Users</h1>
           <p className="text-white/70">View and manage system users</p>
         </div>
+        <Button 
+          onClick={() => setIsCreateUserDialogOpen(true)} 
+          className="mt-4 sm:mt-0"
+        >
+          <UserPlus className="mr-2 h-4 w-4" />
+          Create User
+        </Button>
       </div>
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 space-y-4 sm:space-y-0">
@@ -334,6 +402,91 @@ const AdminUsers = () => {
               Delete
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create User Dialog */}
+      <Dialog open={isCreateUserDialogOpen} onOpenChange={setIsCreateUserDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New User</DialogTitle>
+            <DialogDescription>
+              Fill out this form to create a new user account.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateUser}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="email" className="text-right">
+                  Email
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={newUserForm.email}
+                  onChange={(e) => setNewUserForm({...newUserForm, email: e.target.value})}
+                  className="col-span-3"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="password" className="text-right">
+                  Password
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={newUserForm.password}
+                  onChange={(e) => setNewUserForm({...newUserForm, password: e.target.value})}
+                  className="col-span-3"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="firstName" className="text-right">
+                  First Name
+                </Label>
+                <Input
+                  id="firstName"
+                  value={newUserForm.firstName}
+                  onChange={(e) => setNewUserForm({...newUserForm, firstName: e.target.value})}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="lastName" className="text-right">
+                  Last Name
+                </Label>
+                <Input
+                  id="lastName"
+                  value={newUserForm.lastName}
+                  onChange={(e) => setNewUserForm({...newUserForm, lastName: e.target.value})}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="isAdmin" className="text-right">
+                  Admin Role
+                </Label>
+                <div className="flex items-center space-x-2 col-span-3">
+                  <input
+                    id="isAdmin"
+                    type="checkbox"
+                    checked={newUserForm.isAdmin}
+                    onChange={(e) => setNewUserForm({...newUserForm, isAdmin: e.target.checked})}
+                    className="rounded text-primary focus:ring-primary"
+                  />
+                  <Label htmlFor="isAdmin">Grant admin privileges</Label>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsCreateUserDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Create User</Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
