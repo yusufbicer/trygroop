@@ -65,25 +65,25 @@ const fetchBlogPost = async (slug: string) => {
 
 const getFormattedBlogs = (data: any[]) => {
   return data.map((post) => {
-    // Process categories
-    const categories = post.categories?.map((item: any) => {
-      if (typeof item === 'object' && item !== null) {
+    // Process categories from blog_posts_categories relation
+    const categories = post.blog_posts_categories?.map((item: any) => {
+      if (item.blog_categories && typeof item.blog_categories === 'object') {
         return {
-          id: item.id || null,
-          name: item.name || null,
-          slug: item.slug || null
+          id: item.blog_categories.id || null,
+          name: item.blog_categories.name || null,
+          slug: item.blog_categories.slug || null
         };
       }
       return { id: null, name: null, slug: null };
     }) || [];
-
-    // Process tags
-    const tags = post.tags?.map((item: any) => {
-      if (typeof item === 'object' && item !== null) {
+    
+    // Process tags from blog_posts_tags relation
+    const tags = post.blog_posts_tags?.map((item: any) => {
+      if (item.blog_tags && typeof item.blog_tags === 'object') {
         return {
-          id: item.id || null,
-          name: item.name || null,
-          slug: item.slug || null
+          id: item.blog_tags.id || null,
+          name: item.blog_tags.name || null,
+          slug: item.blog_tags.slug || null
         };
       }
       return { id: null, name: null, slug: null };
@@ -112,6 +112,42 @@ export const useBlogs = () => {
     queryFn: async () => {
       const data = await fetchBlogs();
       return getFormattedBlogs(data);
+    },
+  });
+};
+
+export const useBlog = useBlogs; // Add alias for backward compatibility
+
+export const useAdminBlog = () => {
+  return useQuery({
+    queryKey: ['admin-blogs'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('blog_posts')
+        .select(`
+          id,
+          title,
+          slug,
+          content,
+          excerpt,
+          published,
+          featured_image,
+          created_at,
+          updated_at,
+          published_at,
+          author_id,
+          profiles(first_name, last_name),
+          blog_posts_categories(category_id, blog_categories(id, name, slug)),
+          blog_posts_tags(tag_id, blog_tags(id, name, slug))
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching admin blog posts:', error);
+        throw error;
+      }
+
+      return data;
     },
   });
 };
@@ -161,6 +197,80 @@ const formatBlogPost = (post: any) => {
     const lastName = post.profiles.last_name || '';
     authorName = `${firstName} ${lastName}`.trim() || 'Unknown Author';
   }
+
+// Admin operations
+export const createBlogPost = async (postData: Partial<BlogPost>) => {
+  const { data, error } = await supabase
+    .from('blog_posts')
+    .insert([postData])
+    .select();
+
+  if (error) {
+    console.error('Error creating blog post:', error);
+    throw error;
+  }
+
+  return data?.[0];
+};
+
+export const updateBlogPost = async (postId: string, postData: Partial<BlogPost>) => {
+  const { data, error } = await supabase
+    .from('blog_posts')
+    .update(postData)
+    .eq('id', postId)
+    .select();
+
+  if (error) {
+    console.error('Error updating blog post:', error);
+    throw error;
+  }
+
+  return data?.[0];
+};
+
+export const deleteBlogPost = async (postId: string) => {
+  const { error } = await supabase
+    .from('blog_posts')
+    .delete()
+    .eq('id', postId);
+
+  if (error) {
+    console.error('Error deleting blog post:', error);
+    throw error;
+  }
+
+  return true;
+};
+
+// Category and tag operations
+export const getCategories = async () => {
+  const { data, error } = await supabase
+    .from('blog_categories')
+    .select('*')
+    .order('name');
+
+  if (error) {
+    console.error('Error fetching categories:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+export const getTags = async () => {
+  const { data, error } = await supabase
+    .from('blog_tags')
+    .select('*')
+    .order('name');
+
+  if (error) {
+    console.error('Error fetching tags:', error);
+    throw error;
+  }
+
+  return data;
+};
+
 
   return {
     ...post,
