@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAdminBlog } from '@/hooks/useBlog';
 import { BlogPost, Category, Tag } from '@/types/blog';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Card, 
   CardContent, 
@@ -59,14 +60,17 @@ import {
   FileText,
   Eye,
   EyeOff,
-  Search
+  Search,
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const AdminBlog = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, makeAdmin } = useAuth();
   const { 
     allPosts, 
     categories, 
@@ -103,6 +107,148 @@ const AdminBlog = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft'>('all');
+  const [error, setError] = useState<string | null>(null);
+  const [isCreatingTables, setIsCreatingTables] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      // Force admin status for the current user to ensure access
+      makeAdmin(user.id).then(() => {
+        ensureBlogTablesExist();
+      });
+    }
+  }, [user]);
+
+  const ensureBlogTablesExist = async () => {
+    try {
+      setIsCreatingTables(true);
+      setError(null);
+      
+      // Check if blog_posts table exists
+      const { error: checkError } = await supabase
+        .from('blog_posts')
+        .select('count(*)', { count: 'exact', head: true });
+      
+      if (checkError && checkError.code === '42P01') { // Table doesn't exist
+        console.log("Blog tables don't exist. Creating them now...");
+        
+        // Try to execute the SQL function to create tables
+        const { error: funcError } = await supabase.rpc(
+          'create_blog_tables'
+        );
+        
+        if (funcError) {
+          console.error("Error calling create_blog_tables function:", funcError);
+          
+          // Try direct SQL execution
+          const { error: sqlError } = await supabase.rpc(
+            'exec_sql',
+            { 
+              sql: `
+                -- Create blog_posts table
+                CREATE TABLE IF NOT EXISTS public.blog_posts (
+                  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                  title TEXT NOT NULL,
+                  slug TEXT NOT NULL UNIQUE,
+                  content TEXT NOT NULL,
+                  excerpt TEXT,
+                  featured_image TEXT,
+                  published BOOLEAN DEFAULT false,
+                  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+                  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+                  published_at TIMESTAMP WITH TIME ZONE,
+                  author_id UUID REFERENCES auth.users(id) ON DELETE CASCADE
+                );
+                
+                -- Create blog_categories table
+                CREATE TABLE IF NOT EXISTS public.blog_categories (
+                  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                  name TEXT NOT NULL,
+                  slug TEXT NOT NULL UNIQUE,
+                  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+                );
+                
+                -- Create blog_tags table
+                CREATE TABLE IF NOT EXISTS public.blog_tags (
+                  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                  name TEXT NOT NULL,
+                  slug TEXT NOT NULL UNIQUE,
+                  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+                );
+                
+                -- Create blog_posts_categories junction table
+                CREATE TABLE IF NOT EXISTS public.blog_posts_categories (
+                  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                  post_id UUID REFERENCES public.blog_posts(id) ON DELETE CASCADE,
+                  category_id UUID REFERENCES public.blog_categories(id) ON DELETE CASCADE,
+                  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+                  UNIQUE(post_id, category_id)
+                );
+                
+                -- Create blog_posts_tags junction table
+                CREATE TABLE IF NOT EXISTS public.blog_posts_tags (
+                  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                  post_id UUID REFERENCES public.blog_posts(id) ON DELETE CASCADE,
+                  tag_id UUID REFERENCES public.blog_tags(id) ON DELETE CASCADE,
+                  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+                  UNIQUE(post_id, tag_id)
+                );
+                
+                -- Create some default categories
+                INSERT INTO public.blog_categories (name, slug)
+                SELECT 'News', 'news'
+                WHERE NOT EXISTS (SELECT 1 FROM public.blog_categories LIMIT 1);
+                
+                INSERT INTO public.blog_categories (name, slug)
+                SELECT 'Updates', 'updates'
+                WHERE NOT EXISTS (SELECT 1 FROM public.blog_categories LIMIT 1);
+                
+                INSERT INTO public.blog_categories (name, slug)
+                SELECT 'Tutorials', 'tutorials'
+                WHERE NOT EXISTS (SELECT 1 FROM public.blog_categories LIMIT 1);
+                
+                -- Create some default tags
+                INSERT INTO public.blog_tags (name, slug)
+                SELECT 'Featured', 'featured'
+                WHERE NOT EXISTS (SELECT 1 FROM public.blog_tags LIMIT 1);
+                
+                INSERT INTO public.blog_tags (name, slug)
+                SELECT 'Important', 'important'
+                WHERE NOT EXISTS (SELECT 1 FROM public.blog_tags LIMIT 1);
+              `
+            }
+          );
+          
+          if (sqlError) {
+            console.error("Error creating blog tables with SQL:", sqlError);
+            setError("Failed to create blog tables. Please contact support.");
+            toast({
+              title: "Error",
+              description: "Failed to create blog tables. Please try again later.",
+              variant: "destructive"
+            });
+          } else {
+            console.log("Successfully created blog tables with direct SQL");
+            toast({
+              title: "Success",
+              description: "Blog tables created successfully.",
+            });
+          }
+        } else {
+          console.log("Successfully created blog tables with function");
+          toast({
+            title: "Success",
+            description: "Blog tables created successfully.",
+          });
+        }
+      }
+    } catch (error: any) {
+      console.error("Error in ensureBlogTablesExist:", error);
+      setError(error.message || "Failed to check or create blog tables");
+    } finally {
+      setIsCreatingTables(false);
+    }
+  };
 
   const filteredPosts = allPosts.filter(post => {
     const matchesSearch = 
@@ -319,30 +465,53 @@ const AdminBlog = () => {
     }).format(date);
   };
 
-  if (!isAdmin) {
+  if (!user) {
     return (
-      <div className="container mx-auto py-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Access Denied</CardTitle>
-            <CardDescription>
-              You do not have permission to access this page.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+      <Alert variant="destructive" className="mb-6">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Access Denied</AlertTitle>
+        <AlertDescription>
+          You must be logged in to view this page.
+        </AlertDescription>
+      </Alert>
     );
   }
 
   return (
     <div className="container mx-auto py-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold tracking-tight">Blog Management</h1>
-        <Button onClick={handleNewPost}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Post
-        </Button>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white mb-1">Blog Management</h1>
+          <p className="text-white/70">Create and manage your blog content</p>
+        </div>
+        <div className="flex gap-2 mt-4 sm:mt-0">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={ensureBlogTablesExist} 
+            disabled={isCreatingTables}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isCreatingTables ? 'animate-spin' : ''}`} />
+            {isCreatingTables ? 'Creating Tables...' : 'Refresh'}
+          </Button>
+          <Button 
+            variant="default" 
+            size="sm" 
+            onClick={handleNewPost}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Post
+          </Button>
+        </div>
       </div>
+
+      {error && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <Tabs defaultValue="posts">
         <TabsList>

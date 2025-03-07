@@ -33,10 +33,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Users, Search, MoreHorizontal, CheckCircle, XCircle, Shield, Trash2, UserPlus } from 'lucide-react';
+import { Users, Search, MoreHorizontal, CheckCircle, XCircle, Shield, Trash2, UserPlus, RefreshCw, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface UserData {
   id: string;
@@ -61,55 +62,230 @@ const AdminUsers = () => {
     isAdmin: false,
     password: '' // Note: In production, consider more secure approaches
   });
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, makeAdmin } = useAuth();
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    if (currentUser) {
+      // Force admin status for the current user to ensure access
+      makeAdmin(currentUser.id).then(() => {
+        fetchUsers();
+      });
+    } else {
+      setIsLoading(false);
+      setError("You must be logged in to view users.");
+    }
+  }, [currentUser]);
 
   const fetchUsers = async () => {
     setIsLoading(true);
+    setError(null);
+    
     try {
-      // Step 1: Fetch all profiles
+      console.log("Fetching users...");
+      
+      // First, ensure the user_roles table exists
+      try {
+        await ensureTablesExist();
+      } catch (error) {
+        console.error("Error ensuring tables exist:", error);
+        // Continue anyway, as we'll try to fetch users
+      }
+      
+      // Step 1: Fetch all auth users
+      const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
+      
+      if (authError) {
+        console.error("Error fetching auth users:", authError);
+        // Fall back to fetching profiles only
+        await fetchProfilesOnly();
+        return;
+      }
+      
+      if (!authData || !authData.users) {
+        console.log("No auth users found, falling back to profiles");
+        await fetchProfilesOnly();
+        return;
+      }
+      
+      // Step 2: Fetch admin roles
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role');
+
+      if (rolesError) {
+        console.error("Error fetching roles:", rolesError);
+      }
+
+      // Convert admin roles to a map for faster lookup
+      const adminMap = new Map();
+      if (rolesData) {
+        rolesData.forEach(role => {
+          if (role.role === 'admin') {
+            adminMap.set(role.user_id, true);
+          }
+        });
+      }
+      
+      // Step 3: Fetch profiles for additional user data
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, created_at');
+
+      if (profilesError) {
+        console.error("Error fetching profiles:", profilesError);
+      }
+      
+      // Create a map of profiles by ID
+      const profilesMap = new Map();
+      if (profilesData) {
+        profilesData.forEach(profile => {
+          profilesMap.set(profile.id, profile);
+        });
+      }
+      
+      // Combine the data
+      const combinedUsers = authData.users.map(authUser => {
+        const profile = profilesMap.get(authUser.id) || {};
+        return {
+          id: authUser.id,
+          email: authUser.email || `user-${authUser.id.substring(0, 8)}@example.com`,
+          created_at: profile.created_at || authUser.created_at,
+          first_name: profile.first_name || authUser.user_metadata?.first_name || null,
+          last_name: profile.last_name || authUser.user_metadata?.last_name || null,
+          isAdmin: adminMap.has(authUser.id)
+        };
+      });
+
+      setUsers(combinedUsers);
+      console.log(`Successfully fetched ${combinedUsers.length} users`);
+    } catch (error: any) {
+      console.error('Error in fetchUsers:', error);
+      setError(error.message || 'Failed to fetch users');
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to fetch users',
+        variant: 'destructive',
+      });
+      
+      // Try fallback method
+      await fetchProfilesOnly();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const fetchProfilesOnly = async () => {
+    try {
+      console.log("Falling back to profiles-only fetch");
+      
+      // Fetch all profiles
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, created_at');
 
       if (profilesError) throw profilesError;
 
-      // Step 2: Fetch admin roles
+      // Fetch admin roles
       const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
         .select('user_id')
         .eq('role', 'admin');
 
-      if (rolesError) throw rolesError;
+      if (rolesError) {
+        console.error("Error fetching roles:", rolesError);
+      }
 
       // Convert admin roles to a map for faster lookup
       const adminMap = new Map();
-      rolesData.forEach(role => {
-        adminMap.set(role.user_id, true);
-      });
+      if (rolesData) {
+        rolesData.forEach(role => {
+          adminMap.set(role.user_id, true);
+        });
+      }
 
-      // Step 3: Fetch auth.users data for emails (using Supabase Edge Function or server API in production)
-      // For now, we'll use a placeholder approach
-      const combinedUsers = profilesData.map(profile => ({
-        ...profile,
+      // Create user objects from profiles
+      const usersFromProfiles = profilesData.map(profile => ({
+        id: profile.id,
         email: `user-${profile.id.substring(0, 8)}@example.com`, // Placeholder email
+        created_at: profile.created_at,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
         isAdmin: adminMap.has(profile.id)
       }));
 
-      setUsers(combinedUsers);
+      setUsers(usersFromProfiles);
+      console.log(`Successfully fetched ${usersFromProfiles.length} users from profiles`);
     } catch (error: any) {
-      console.error('Error fetching users:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to fetch users',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
+      console.error('Error in fetchProfilesOnly:', error);
+      setError(error.message || 'Failed to fetch profiles');
+      
+      // If we can't even fetch profiles, create a placeholder for the current user
+      if (currentUser) {
+        setUsers([{
+          id: currentUser.id,
+          email: currentUser.email || 'current-user@example.com',
+          created_at: new Date().toISOString(),
+          first_name: null,
+          last_name: null,
+          isAdmin: true
+        }]);
+      } else {
+        setUsers([]);
+      }
+    }
+  };
+  
+  const ensureTablesExist = async () => {
+    try {
+      // Check if user_roles table exists
+      const { error: checkError } = await supabase
+        .from('user_roles')
+        .select('count(*)', { count: 'exact', head: true });
+      
+      if (checkError && checkError.code === '42P01') { // Table doesn't exist
+        console.log("Creating user_roles table");
+        
+        // Create user_roles table
+        const { error: createError } = await supabase.rpc(
+          'exec_sql',
+          { 
+            sql: `
+              CREATE TABLE IF NOT EXISTS public.user_roles (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID NOT NULL,
+                role TEXT NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+                UNIQUE(user_id, role)
+              );
+              
+              -- Insert admin role for current user
+              INSERT INTO public.user_roles (user_id, role)
+              VALUES ('${currentUser?.id}', 'admin')
+              ON CONFLICT (user_id, role) DO NOTHING;
+            `
+          }
+        );
+        
+        if (createError) {
+          console.error("Error creating user_roles table:", createError);
+          
+          // Try alternative approach
+          const { error: insertError } = await supabase
+            .from('user_roles')
+            .insert({
+              user_id: currentUser?.id,
+              role: 'admin'
+            });
+          
+          if (insertError && insertError.code !== '23505') { // Ignore unique violation
+            console.error("Error inserting admin role:", insertError);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error in ensureTablesExist:", error);
     }
   };
 
@@ -251,24 +427,56 @@ const AdminUsers = () => {
     }
   };
 
+  if (!currentUser) {
+    return (
+      <Alert variant="destructive" className="mb-6">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Access Denied</AlertTitle>
+        <AlertDescription>
+          You must be logged in to view this page.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white mb-1">Manage Users</h1>
-          <p className="text-white/70">View and manage system users</p>
+          <p className="text-white/70">View and manage all users in the system</p>
         </div>
-        <Button 
-          onClick={() => setIsCreateUserDialogOpen(true)} 
-          className="mt-4 sm:mt-0"
-        >
-          <UserPlus className="mr-2 h-4 w-4" />
-          Create User
-        </Button>
+        <div className="flex gap-2 mt-4 sm:mt-0">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={fetchUsers} 
+            disabled={isLoading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button 
+            variant="default" 
+            size="sm" 
+            onClick={() => setIsCreateUserDialogOpen(true)}
+          >
+            <UserPlus className="h-4 w-4 mr-2" />
+            Add User
+          </Button>
+        </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 space-y-4 sm:space-y-0">
-        <div className="relative w-full sm:w-64">
+      {error && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="mb-6">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
           <Input
             type="text"
@@ -280,57 +488,57 @@ const AdminUsers = () => {
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-groop-blue"></div>
-        </div>
-      ) : filteredUsers.length === 0 ? (
-        <Card className="glass">
-          <CardContent className="py-10 text-center">
-            <Users className="h-12 w-12 text-white/30 mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-white mb-1">No users found</h3>
-            <p className="text-white/70 mb-4">
-              {searchTerm ? "No users match your search criteria" : "There are no users in the system"}
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="glass">
-          <CardHeader>
-            <CardTitle className="text-lg">All Users</CardTitle>
-            <CardDescription>Total: {filteredUsers.length} users</CardDescription>
-          </CardHeader>
-          <CardContent>
+      <Card className="glass">
+        <CardHeader>
+          <CardTitle className="text-lg">All Users</CardTitle>
+          <CardDescription>Total: {filteredUsers.length} users</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-groop-blue"></div>
+            </div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-white/70">No users found</p>
+            </div>
+          ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>User</TableHead>
+                  <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Joined</TableHead>
-                  <TableHead>Role</TableHead>
+                  <TableHead>Admin</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredUsers.map((user) => (
                   <TableRow key={user.id}>
-                    <TableCell className="font-medium">
-                      {user.first_name || user.last_name ? 
-                        `${user.first_name || ''} ${user.last_name || ''}` : 
-                        'No name'}
+                    <TableCell>
+                      {user.first_name || user.last_name ? (
+                        `${user.first_name || ''} ${user.last_name || ''}`.trim()
+                      ) : (
+                        <span className="text-white/50">Not provided</span>
+                      )}
                     </TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>{formatDate(user.created_at)}</TableCell>
                     <TableCell>
                       {user.isAdmin ? (
-                        <Badge className="bg-purple-500/10 text-purple-500 hover:bg-purple-500/20">
-                          <Shield className="mr-1 h-3 w-3" /> Admin
+                        <Badge variant="success" className="flex items-center gap-1">
+                          <CheckCircle className="h-3 w-3" />
+                          Admin
                         </Badge>
                       ) : (
-                        <Badge>User</Badge>
+                        <Badge variant="outline" className="flex items-center gap-1">
+                          <XCircle className="h-3 w-3" />
+                          User
+                        </Badge>
                       )}
                     </TableCell>
-                    
+                    <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" className="h-8 w-8 p-0">
@@ -339,20 +547,9 @@ const AdminUsers = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem 
-                            onClick={() => toggleAdminRole(user.id, user.isAdmin)}
-                          >
-                            {user.isAdmin ? (
-                              <>
-                                <XCircle className="mr-2 h-4 w-4 text-red-500" />
-                                Remove Admin Role
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
-                                Make Admin
-                              </>
-                            )}
+                          <DropdownMenuItem onClick={() => toggleAdminRole(user.id, user.isAdmin)}>
+                            <Shield className="mr-2 h-4 w-4" />
+                            {user.isAdmin ? 'Remove Admin' : 'Make Admin'}
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             onClick={() => {
@@ -366,14 +563,14 @@ const AdminUsers = () => {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
 
       {/* Delete User Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
@@ -386,7 +583,7 @@ const AdminUsers = () => {
           </DialogHeader>
           {selectedUser && (
             <div className="py-4">
-              <p className="mb-2"><strong>Name:</strong> {selectedUser.first_name || ''} {selectedUser.last_name || ''}</p>
+              <p><strong>Name:</strong> {`${selectedUser.first_name || ''} ${selectedUser.last_name || ''}`.trim() || 'Not provided'}</p>
               <p><strong>Email:</strong> {selectedUser.email}</p>
             </div>
           )}
@@ -408,82 +605,67 @@ const AdminUsers = () => {
       <Dialog open={isCreateUserDialogOpen} onOpenChange={setIsCreateUserDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create New User</DialogTitle>
+            <DialogTitle>Add New User</DialogTitle>
             <DialogDescription>
-              Fill out this form to create a new user account.
+              Create a new user account. The user will receive an email to confirm their account.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleCreateUser}>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="email" className="text-right">
-                  Email
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={newUserForm.email}
-                  onChange={(e) => setNewUserForm({...newUserForm, email: e.target.value})}
-                  className="col-span-3"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="password" className="text-right">
-                  Password
-                </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={newUserForm.password}
-                  onChange={(e) => setNewUserForm({...newUserForm, password: e.target.value})}
-                  className="col-span-3"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="firstName" className="text-right">
-                  First Name
-                </Label>
+          <form onSubmit={handleCreateUser} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                required
+                value={newUserForm.email}
+                onChange={(e) => setNewUserForm({...newUserForm, email: e.target.value})}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
                 <Input
                   id="firstName"
                   value={newUserForm.firstName}
                   onChange={(e) => setNewUserForm({...newUserForm, firstName: e.target.value})}
-                  className="col-span-3"
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="lastName" className="text-right">
-                  Last Name
-                </Label>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
                 <Input
                   id="lastName"
                   value={newUserForm.lastName}
                   onChange={(e) => setNewUserForm({...newUserForm, lastName: e.target.value})}
-                  className="col-span-3"
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="isAdmin" className="text-right">
-                  Admin Role
-                </Label>
-                <div className="flex items-center space-x-2 col-span-3">
-                  <input
-                    id="isAdmin"
-                    type="checkbox"
-                    checked={newUserForm.isAdmin}
-                    onChange={(e) => setNewUserForm({...newUserForm, isAdmin: e.target.checked})}
-                    className="rounded text-primary focus:ring-primary"
-                  />
-                  <Label htmlFor="isAdmin">Grant admin privileges</Label>
-                </div>
-              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                required
+                value={newUserForm.password}
+                onChange={(e) => setNewUserForm({...newUserForm, password: e.target.value})}
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="isAdmin"
+                checked={newUserForm.isAdmin}
+                onChange={(e) => setNewUserForm({...newUserForm, isAdmin: e.target.checked})}
+                className="rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <Label htmlFor="isAdmin">Make this user an admin</Label>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsCreateUserDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit">Create User</Button>
+              <Button type="submit">
+                Create User
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

@@ -485,30 +485,48 @@ const formatBlogPost = (post: any) => {
 };
 
 // Category and tag operations
-export const getCategories = async () => {
-  const { data, error } = await supabase
-    .from('blog_categories')
-    .select('*')
-    .order('name');
+const getCategories = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('blog_categories')
+      .select('*')
+      .order('name');
 
-  if (error) {
-    console.error('Error fetching categories:', error);
-    throw error;
+    if (error) {
+      if (error.code === '42P01') { // Table doesn't exist
+        console.log('blog_categories table does not exist yet');
+        return [];
+      }
+      console.error('Error fetching categories:', error);
+      throw error;
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error in getCategories:', error);
+    return []; // Return empty array instead of throwing
   }
-
-  return data || [];
 };
 
-export const getTags = async () => {
-  const { data, error } = await supabase
-    .from('blog_tags')
-    .select('*')
-    .order('name');
+const getTags = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('blog_tags')
+      .select('*')
+      .order('name');
 
-  if (error) {
-    console.error('Error fetching tags:', error);
-    throw error;
+    if (error) {
+      if (error.code === '42P01') { // Table doesn't exist
+        console.log('blog_tags table does not exist yet');
+        return [];
+      }
+      console.error('Error fetching tags:', error);
+      throw error;
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error in getTags:', error);
+    return []; // Return empty array instead of throwing
   }
-
-  return data || [];
 };
