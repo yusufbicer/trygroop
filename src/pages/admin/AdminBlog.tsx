@@ -173,6 +173,12 @@ const AdminBlog = () => {
 
     try {
       const slug = postForm.slug || generateSlug(postForm.title);
+      
+      // Show loading toast
+      toast({
+        title: currentPostId ? 'Updating post...' : 'Creating post...',
+        description: 'Please wait while we save your post.',
+      });
 
       if (currentPostId) {
         await updatePost.mutateAsync({
@@ -184,13 +190,19 @@ const AdminBlog = () => {
             excerpt: postForm.excerpt || null,
             featured_image: postForm.featured_image || null,
             published: postForm.published,
-            author_id: user.id
+            author_id: user.id,
+            updated_at: new Date().toISOString()
           },
           categoryIds: postForm.selectedCategories,
           tagIds: postForm.selectedTags
         });
+        
+        toast({
+          title: 'Success!',
+          description: 'Your post has been updated successfully.',
+        });
       } else {
-        await createPost.mutateAsync({
+        const result = await createPost.mutateAsync({
           post: {
             title: postForm.title,
             slug,
@@ -206,12 +218,24 @@ const AdminBlog = () => {
           categoryIds: postForm.selectedCategories,
           tagIds: postForm.selectedTags
         });
+        
+        if (result) {
+          toast({
+            title: 'Success!',
+            description: 'Your post has been created successfully.',
+          });
+        }
       }
 
       resetPostForm();
       setIsPostModalOpen(false);
     } catch (error) {
       console.error('Error saving post:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to save post. Please try again.',
+        variant: 'destructive'
+      });
     }
   };
 
