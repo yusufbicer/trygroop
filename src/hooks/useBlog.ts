@@ -46,9 +46,9 @@ export const useBlog = () => {
             .eq('post_id', post.id);
 
           const categories = categoriesData?.map(item => ({
-            id: item.blog_categories.id,
-            name: item.blog_categories.name,
-            slug: item.blog_categories.slug
+            id: item.blog_categories?.id,
+            name: item.blog_categories?.name,
+            slug: item.blog_categories?.slug
           })) || [];
 
           // Fetch tags for each post
@@ -61,9 +61,9 @@ export const useBlog = () => {
             .eq('post_id', post.id);
 
           const tags = tagsData?.map(item => ({
-            id: item.blog_tags.id,
-            name: item.blog_tags.name,
-            slug: item.blog_tags.slug
+            id: item.blog_tags?.id,
+            name: item.blog_tags?.name,
+            slug: item.blog_tags?.slug
           })) || [];
 
           return {
@@ -162,9 +162,9 @@ export const useAdminBlog = () => {
             .eq('post_id', post.id);
 
           const categories = categoriesData?.map(item => ({
-            id: item.blog_categories.id,
-            name: item.blog_categories.name,
-            slug: item.blog_categories.slug
+            id: item.blog_categories?.id,
+            name: item.blog_categories?.name,
+            slug: item.blog_categories?.slug
           })) || [];
 
           // Fetch tags for each post
@@ -177,9 +177,9 @@ export const useAdminBlog = () => {
             .eq('post_id', post.id);
 
           const tags = tagsData?.map(item => ({
-            id: item.blog_tags.id,
-            name: item.blog_tags.name,
-            slug: item.blog_tags.slug
+            id: item.blog_tags?.id,
+            name: item.blog_tags?.name,
+            slug: item.blog_tags?.slug
           })) || [];
 
           return {
@@ -247,7 +247,18 @@ export const useAdminBlog = () => {
       // Insert the blog post
       const { data: newPost, error: postError } = await supabase
         .from('blog_posts')
-        .insert(post)
+        .insert({
+          title: post.title,
+          slug: post.slug,
+          content: post.content,
+          excerpt: post.excerpt,
+          featured_image: post.featured_image,
+          published: post.published,
+          published_at: post.published_at,
+          author_id: post.author_id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
         .select()
         .single();
 
@@ -311,7 +322,10 @@ export const useAdminBlog = () => {
       // Update the blog post
       const { data: updatedPost, error: postError } = await supabase
         .from('blog_posts')
-        .update(post)
+        .update({
+          ...post,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', id)
         .select()
         .single();
