@@ -4,8 +4,7 @@ import { BlogPost } from '@/types/blog';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, Calendar, Tag as TagIcon, User } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { ArrowRight, Calendar, User } from 'lucide-react';
 import { useBlog } from '@/hooks/useBlog';
 
 interface BlogPreviewProps {
@@ -29,8 +28,8 @@ const BlogPreview: React.FC<BlogPreviewProps> = ({ posts: providedPosts }) => {
   // Show a loading state while fetching posts
   if (!providedPosts && isLoading) {
     return (
-      <section className="py-16 bg-gray-50">
-        <div className="container mx-auto">
+      <section id="blog" className="py-16 bg-gray-50 scroll-mt-16">
+        <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold mb-4">Latest From Our Blog</h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
@@ -61,8 +60,8 @@ const BlogPreview: React.FC<BlogPreviewProps> = ({ posts: providedPosts }) => {
   }
 
   return (
-    <section className="py-16 bg-gray-50">
-      <div className="container mx-auto">
+    <section id="blog" className="py-16 bg-gray-50 scroll-mt-16">
+      <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold mb-4">Latest From Our Blog</h2>
           <p className="text-gray-600 max-w-2xl mx-auto">
@@ -73,7 +72,7 @@ const BlogPreview: React.FC<BlogPreviewProps> = ({ posts: providedPosts }) => {
         {posts && posts.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {posts.slice(0, 3).map((post) => (
-              <Card key={post.id} className="h-full flex flex-col">
+              <Card key={post.id} className="h-full flex flex-col shadow-md hover:shadow-lg transition-shadow">
                 {post.featured_image && (
                   <div className="h-48 w-full overflow-hidden">
                     <img 
@@ -94,7 +93,7 @@ const BlogPreview: React.FC<BlogPreviewProps> = ({ posts: providedPosts }) => {
                     </Link>
                   </CardTitle>
                   <CardDescription className="mt-2">
-                    {post.excerpt || post.content.substring(0, 120) + '...'}
+                    {post.excerpt || (post.content.substring(0, 120) + '...')}
                   </CardDescription>
                 </CardHeader>
                 <CardFooter className="pt-0">

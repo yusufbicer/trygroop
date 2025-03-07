@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email address' }),
@@ -32,10 +34,13 @@ type SignupFormValues = z.infer<typeof signupSchema>;
 
 const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || '/dashboard';
+  const queryParams = new URLSearchParams(location.search);
+  const defaultTab = queryParams.get('tab') === 'signup' ? 'signup' : 'login';
 
   // If user is already logged in, redirect to dashboard
   if (user) {
@@ -64,8 +69,11 @@ const Auth = () => {
 
   const onLogin = async (values: LoginFormValues) => {
     setIsLoading(true);
+    setAuthError(null);
     try {
       await signIn(values.email, values.password);
+    } catch (error: any) {
+      setAuthError(error.message || 'Failed to sign in. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
@@ -73,9 +81,12 @@ const Auth = () => {
 
   const onSignup = async (values: SignupFormValues) => {
     setIsLoading(true);
+    setAuthError(null);
     try {
       const { first_name, last_name, email, password } = values;
       await signUp(email, password, { first_name, last_name });
+    } catch (error: any) {
+      setAuthError(error.message || 'Failed to create account. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -97,7 +108,14 @@ const Auth = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="login" className="w-full">
+            {authError && (
+              <Alert variant="destructive" className="mb-6">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{authError}</AlertDescription>
+              </Alert>
+            )}
+            
+            <Tabs defaultValue={defaultTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="login">Login</TabsTrigger>
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>

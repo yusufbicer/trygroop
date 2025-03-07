@@ -138,7 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signOut = async () => {
+  const signOut = async (): Promise<void> => {
     try {
       setLoading(true);
       const { error } = await supabase.auth.signOut();
@@ -150,7 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           description: error.message,
           variant: "destructive"
         });
-        return false;
+        return;
       }
       
       // Force clear session and user state
@@ -164,10 +164,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: "Signed out",
         description: "You have been successfully signed out."
       });
-      return true;
     } catch (error) {
       console.error("Unexpected error during sign out:", error);
-      return false;
     } finally {
       setLoading(false);
     }

@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Menu, X, User } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Menu, X, MessageCircle } from 'lucide-react';
 import { CustomButton } from '../ui/CustomButton';
 import { useAuth } from '@/context/AuthContext';
 
@@ -9,6 +9,7 @@ const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -24,6 +25,20 @@ const Navbar = () => {
       window.removeEventListener('scroll', handleScroll);
     };
   }, []);
+
+  const handleChatClick = () => {
+    // This will be replaced with WhatsApp functionality later
+    alert('Chat functionality will be implemented later');
+  };
+
+  const scrollToSection = (sectionId: string) => {
+    const section = document.getElementById(sectionId);
+    setIsMobileMenuOpen(false);
+    
+    if (section) {
+      section.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   return (
     <nav
@@ -45,15 +60,31 @@ const Navbar = () => {
               <Link to="/" className="text-white/80 hover:text-white transition-colors">
                 Home
               </Link>
-              <Link to="/#features" className="text-white/80 hover:text-white transition-colors">
+              <button 
+                onClick={() => scrollToSection('features')} 
+                className="text-white/80 hover:text-white transition-colors"
+              >
                 Features
-              </Link>
-              <Link to="/#how-it-works" className="text-white/80 hover:text-white transition-colors">
+              </button>
+              <button 
+                onClick={() => scrollToSection('how-it-works')} 
+                className="text-white/80 hover:text-white transition-colors"
+              >
                 How It Works
-              </Link>
-              <Link to="/#blog" className="text-white/80 hover:text-white transition-colors">
+              </button>
+              <button 
+                onClick={() => scrollToSection('blog')} 
+                className="text-white/80 hover:text-white transition-colors"
+              >
                 Blog
-              </Link>
+              </button>
+              <button
+                onClick={handleChatClick}
+                className="text-white/80 hover:text-white transition-colors flex items-center"
+              >
+                <MessageCircle className="h-5 w-5 mr-1" />
+                Chat with us
+              </button>
               {user ? (
                 <>
                   <Link to="/dashboard">
@@ -66,24 +97,23 @@ const Navbar = () => {
                   </CustomButton>
                 </>
               ) : (
-                <>
-                  <Link to="/auth">
-                    <CustomButton variant="secondary" size="sm">
-                      Sign In
-                    </CustomButton>
-                  </Link>
-                  <Link to="/auth?tab=signup">
-                    <CustomButton variant="primary" size="sm" isGlowing>
-                      Get Started
-                    </CustomButton>
-                  </Link>
-                </>
+                <Link to="/auth">
+                  <CustomButton variant="primary" size="sm" isGlowing>
+                    Get Started
+                  </CustomButton>
+                </Link>
               )}
             </div>
           </div>
 
           {/* Mobile menu button */}
-          <div className="md:hidden flex items-center">
+          <div className="md:hidden flex items-center space-x-3">
+            <button
+              onClick={handleChatClick}
+              className="text-white hover:text-groop-blue focus:outline-none"
+            >
+              <MessageCircle className="h-5 w-5" />
+            </button>
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="text-white hover:text-groop-blue focus:outline-none"
@@ -109,27 +139,24 @@ const Navbar = () => {
             >
               Home
             </Link>
-            <Link
-              to="/#features"
-              className="block py-2 text-white hover:text-groop-blue"
-              onClick={() => setIsMobileMenuOpen(false)}
+            <button
+              onClick={() => scrollToSection('features')}
+              className="block w-full text-left py-2 text-white hover:text-groop-blue"
             >
               Features
-            </Link>
-            <Link
-              to="/#how-it-works"
-              className="block py-2 text-white hover:text-groop-blue"
-              onClick={() => setIsMobileMenuOpen(false)}
+            </button>
+            <button
+              onClick={() => scrollToSection('how-it-works')}
+              className="block w-full text-left py-2 text-white hover:text-groop-blue"
             >
               How It Works
-            </Link>
-            <Link
-              to="/#blog"
-              className="block py-2 text-white hover:text-groop-blue"
-              onClick={() => setIsMobileMenuOpen(false)}
+            </button>
+            <button
+              onClick={() => scrollToSection('blog')}
+              className="block w-full text-left py-2 text-white hover:text-groop-blue"
             >
               Blog
-            </Link>
+            </button>
             <div className="flex flex-col gap-3 pt-2">
               {user ? (
                 <>
@@ -154,26 +181,15 @@ const Navbar = () => {
                   </CustomButton>
                 </>
               ) : (
-                <>
-                  <Link to="/auth">
-                    <CustomButton
-                      variant="secondary"
-                      className="w-full"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Sign In
-                    </CustomButton>
-                  </Link>
-                  <Link to="/auth?tab=signup">
-                    <CustomButton
-                      variant="primary"
-                      className="w-full"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Get Started
-                    </CustomButton>
-                  </Link>
-                </>
+                <Link to="/auth">
+                  <CustomButton
+                    variant="primary"
+                    className="w-full"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Get Started
+                  </CustomButton>
+                </Link>
               )}
             </div>
           </div>

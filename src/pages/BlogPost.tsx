@@ -1,49 +1,51 @@
-import { useState, useEffect } from 'react';
+
 import { useParams, Link } from 'react-router-dom';
-import { useBlog } from '@/hooks/useBlog';
-import { BlogPost as BlogPostType } from '@/types/blog';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Calendar, Tag as TagIcon, Folder, User, ArrowLeft } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import Navbar from '@/components/layout/Navbar';
+import Footer from '@/components/layout/Footer';
+import { ChevronLeft, Calendar, User } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const BlogPost = () => {
   const { slug } = useParams<{ slug: string }>();
-  const { fetchPostBySlug, isLoading } = useBlog();
-  const [post, setPost] = useState<BlogPostType | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadPost = async () => {
-      if (!slug) {
-        setError('Post not found');
-        return;
+  const { data: post, isLoading } = useQuery({
+    queryKey: ['blog-post', slug],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('blog_posts')
+        .select(`
+          id,
+          title,
+          slug,
+          content,
+          featured_image,
+          created_at,
+          published_at,
+          author_id,
+          profiles:author_id(first_name, last_name)
+        `)
+        .eq('slug', slug)
+        .eq('published', true)
+        .single();
+
+      if (error) {
+        console.error('Error fetching blog post:', error);
+        return null;
       }
 
-      try {
-        const postData = await fetchPostBySlug(slug);
-        if (postData) {
-          setPost(postData);
-        } else {
-          setError('Post not found');
-        }
-      } catch (err: any) {
-        console.error('Error loading post:', err);
-        setError(err.message || 'Failed to load blog post');
-      }
-    };
-
-    loadPost();
-  }, [slug, fetchPostBySlug]);
+      return {
+        ...data,
+        author_name: data.profiles ? 
+          `${data.profiles.first_name || ''} ${data.profiles.last_name || ''}`.trim() : 
+          'Unknown'
+      };
+    }
+  });
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return '';
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
@@ -52,99 +54,85 @@ const BlogPost = () => {
     }).format(date);
   };
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto py-12 flex justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (error || !post) {
-    return (
-      <div className="container mx-auto py-12">
-        <Card className="max-w-3xl mx-auto">
-          <CardHeader>
-            <CardTitle>Not Found</CardTitle>
-            <CardDescription>
-              {error || 'The blog post you are looking for does not exist.'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild>
-              <Link to="/blog">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Blog
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
-    <div className="container mx-auto py-12">
-      <Button asChild variant="outline" className="mb-8">
-        <Link to="/blog">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Blog
-        </Link>
-      </Button>
-
-      <article className="max-w-4xl mx-auto">
-        {post.featured_image && (
-          <div className="mb-8 rounded-lg overflow-hidden h-[400px]">
-            <img
-              src={post.featured_image}
-              alt={post.title}
-              className="w-full h-full object-cover"
-            />
-          </div>
-        )}
-
-        <div className="mb-6">
-          <h1 className="text-4xl font-bold mb-4">{post.title}</h1>
-          
-          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
-            <div className="flex items-center">
-              <Calendar className="mr-2 h-4 w-4" />
-              {formatDate(post.created_at)}
-            </div>
+    <div className="min-h-screen flex flex-col">
+      <Navbar />
+      
+      <main className="flex-grow pt-20">
+        <div className="max-w-4xl mx-auto px-4 py-12">
+          <div className="mb-8">
+            <Link to="/blog" className="inline-flex items-center text-gray-600 hover:text-primary mb-4">
+              <ChevronLeft size={16} className="mr-1" />
+              Back to all posts
+            </Link>
             
-            {post.author_name && (
-              <div className="flex items-center">
-                <User className="mr-2 h-4 w-4" />
-                {post.author_name}
-              </div>
-            )}
+            <Link to="/" className="inline-flex items-center text-gray-600 hover:text-primary mb-4 ml-4">
+              <ChevronLeft size={16} className="mr-1" />
+              Back to home
+            </Link>
           </div>
+          
+          {isLoading ? (
+            <div className="animate-pulse space-y-4">
+              <div className="h-8 bg-gray-200 rounded w-3/4"></div>
+              <div className="h-6 bg-gray-200 rounded w-1/2"></div>
+              <div className="h-64 bg-gray-200 rounded"></div>
+              <div className="space-y-2">
+                <div className="h-4 bg-gray-200 rounded"></div>
+                <div className="h-4 bg-gray-200 rounded"></div>
+                <div className="h-4 bg-gray-200 rounded"></div>
+                <div className="h-4 bg-gray-200 rounded w-4/5"></div>
+              </div>
+            </div>
+          ) : post ? (
+            <article>
+              <h1 className="text-4xl font-bold text-gray-900 mb-4">{post.title}</h1>
+              
+              <div className="flex items-center text-gray-600 mb-8">
+                <div className="flex items-center mr-6">
+                  <User size={16} className="mr-2" />
+                  <span>{post.author_name || 'Unknown'}</span>
+                </div>
+                <div className="flex items-center">
+                  <Calendar size={16} className="mr-2" />
+                  <span>{formatDate(post.published_at || post.created_at)}</span>
+                </div>
+              </div>
+              
+              {post.featured_image && (
+                <div className="mb-8">
+                  <img 
+                    src={post.featured_image} 
+                    alt={post.title} 
+                    className="w-full h-auto rounded-lg shadow-md"
+                  />
+                </div>
+              )}
+              
+              <div 
+                className="prose prose-lg max-w-none" 
+                dangerouslySetInnerHTML={{ __html: post.content }}
+              />
+              
+              <div className="mt-12 pt-6 border-t border-gray-200">
+                <Button asChild>
+                  <Link to="/blog">View All Posts</Link>
+                </Button>
+              </div>
+            </article>
+          ) : (
+            <div className="text-center py-12">
+              <h2 className="text-2xl font-bold text-gray-800 mb-4">Post Not Found</h2>
+              <p className="text-gray-600 mb-8">The blog post you're looking for doesn't exist or has been removed.</p>
+              <Button asChild>
+                <Link to="/blog">Browse All Posts</Link>
+              </Button>
+            </div>
+          )}
         </div>
-
-        <div className="flex flex-wrap gap-2 mb-6">
-          {post.categories.map((category, index) => (
-            <Badge key={index} variant="outline" className="flex items-center gap-1">
-              <Folder className="h-3 w-3" />
-              {category.name}
-            </Badge>
-          ))}
-          {post.tags.map((tag, index) => (
-            <Badge key={index} variant="secondary" className="flex items-center gap-1">
-              <TagIcon className="h-3 w-3" />
-              {tag.name}
-            </Badge>
-          ))}
-        </div>
-
-        <Separator className="mb-8" />
-
-        <div className="prose prose-lg max-w-none">
-          {/* This could be replaced with a markdown renderer */}
-          {post.content.split('\n').map((paragraph, idx) => (
-            <p key={idx}>{paragraph}</p>
-          ))}
-        </div>
-      </article>
+      </main>
+      
+      <Footer />
     </div>
   );
 };

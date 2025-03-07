@@ -20,14 +20,25 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Users, Search, MoreHorizontal, UserPlus, CheckCircle, XCircle, Shield } from 'lucide-react';
+import { Users, Search, MoreHorizontal, CheckCircle, XCircle, Shield, UserCog, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 interface UserData {
   id: string;
@@ -42,6 +53,8 @@ const AdminUsers = () => {
   const [users, setUsers] = useState<UserData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
 
@@ -75,14 +88,13 @@ const AdminUsers = () => {
 
       // Step 3: Fetch auth.users data for emails
       // Since we can't access auth data directly from client, we'll mock the emails
+      // but in a real app with server functions, you would get real emails
       const combinedUsers = profilesData.map(profile => ({
         ...profile,
         email: `user-${profile.id.substring(0, 8)}@example.com`, // Placeholder email
         isAdmin: adminMap.has(profile.id)
       }));
 
-      console.log("Fetched users:", combinedUsers);
-      
       setUsers(combinedUsers);
     } catch (error: any) {
       console.error('Error fetching users:', error);
@@ -151,6 +163,34 @@ const AdminUsers = () => {
     }
   };
 
+  const handleUserDelete = async (userId: string) => {
+    // This would need to be implemented with a Supabase Edge Function in production
+    // as client-side code cannot delete auth users
+    try {
+      // For now, we'll just delete the profile
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'User deleted',
+        description: 'The user has been removed from the system',
+      });
+
+      fetchUsers();
+      setIsDeleteDialogOpen(false);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete user',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
@@ -171,9 +211,6 @@ const AdminUsers = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button>
-          <UserPlus className="mr-2 h-4 w-4" /> Invite User
-        </Button>
       </div>
 
       {isLoading ? (
@@ -250,6 +287,16 @@ const AdminUsers = () => {
                               </>
                             )}
                           </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setIsDeleteDialogOpen(true);
+                            }}
+                            className="text-red-500 focus:text-red-500"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete User
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -260,6 +307,35 @@ const AdminUsers = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Delete User Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete User</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this user? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedUser && (
+            <div className="py-4">
+              <p className="mb-2"><strong>Name:</strong> {selectedUser.first_name || ''} {selectedUser.last_name || ''}</p>
+              <p><strong>Email:</strong> {selectedUser.email}</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => selectedUser && handleUserDelete(selectedUser.id)}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
