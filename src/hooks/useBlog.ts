@@ -21,7 +21,7 @@ const fetchBlogs = async () => {
       blog_posts_categories(category_id, blog_categories(id, name, slug)),
       blog_posts_tags(tag_id, blog_tags(id, name, slug))
     `)
-    .eq('published', true')
+    .eq('published', true)
     .order('created_at', { ascending: false });
 
   if (error) {
