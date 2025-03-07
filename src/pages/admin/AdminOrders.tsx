@@ -1,4 +1,5 @@
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOrders } from '@/hooks/useOrders';
 import {
@@ -28,16 +29,38 @@ import {
 import { Package, Search, MoreHorizontal, Filter, Eye, Trash } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { Order } from '@/types/data'; // Make sure to import Order type
 
 const AdminOrders = () => {
   const navigate = useNavigate();
   const { orders, isLoading, deleteOrder } = useOrders();
   const [searchTerm, setSearchTerm] = useState('');
+  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const { toast } = useToast();
-
-  const filteredOrders = orders.filter((order) =>
-    order.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  
+  // Status filter
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  
+  // Update filtered orders when search term, status filter, or orders change
+  useEffect(() => {
+    let result = [...orders];
+    
+    // Apply search filter
+    if (searchTerm) {
+      result = result.filter((order) =>
+        order.title.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    // Apply status filter
+    if (statusFilter) {
+      result = result.filter((order) =>
+        order.status.toLowerCase() === statusFilter.toLowerCase()
+      );
+    }
+    
+    setFilteredOrders(result);
+  }, [orders, searchTerm, statusFilter]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -81,6 +104,11 @@ const AdminOrders = () => {
       });
     }
   };
+  
+  // Function to handle filter selection
+  const handleFilterSelect = (status: string | null) => {
+    setStatusFilter(status);
+  };
 
   return (
     <div>
@@ -103,9 +131,30 @@ const AdminOrders = () => {
           />
         </div>
         <div className="flex items-center space-x-2">
-          <CustomButton variant="outline" size="sm">
-            <Filter className="h-4 w-4 mr-2" /> Filter
-          </CustomButton>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <CustomButton variant="outline" size="sm">
+                <Filter className="h-4 w-4 mr-2" /> Filter: {statusFilter || 'All'}
+              </CustomButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleFilterSelect(null)}>
+                All
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleFilterSelect('pending')}>
+                Pending
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleFilterSelect('processing')}>
+                Processing
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleFilterSelect('shipping')}>
+                Shipping
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleFilterSelect('completed')}>
+                Completed
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -119,7 +168,7 @@ const AdminOrders = () => {
             <Package className="h-12 w-12 text-white/30 mx-auto mb-3" />
             <h3 className="text-lg font-medium text-white mb-1">No orders found</h3>
             <p className="text-white/70 mb-4">
-              {searchTerm ? "No orders match your search criteria" : "There are no orders in the system"}
+              {searchTerm || statusFilter ? "No orders match your filter criteria" : "There are no orders in the system"}
             </p>
           </CardContent>
         </Card>

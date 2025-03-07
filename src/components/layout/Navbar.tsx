@@ -72,12 +72,13 @@ const Navbar = () => {
               >
                 How It Works
               </button>
-              <button 
-                onClick={() => scrollToSection('blog')} 
+              {/* Update blog link to go to blog page instead of section */}
+              <Link 
+                to="/blog" 
                 className="text-white/80 hover:text-white transition-colors"
               >
                 Blog
-              </button>
+              </Link>
               <button
                 onClick={handleChatClick}
                 className="text-white/80 hover:text-white transition-colors flex items-center"
@@ -151,12 +152,14 @@ const Navbar = () => {
             >
               How It Works
             </button>
-            <button
-              onClick={() => scrollToSection('blog')}
-              className="block w-full text-left py-2 text-white hover:text-groop-blue"
+            {/* Update mobile blog link */}
+            <Link
+              to="/blog"
+              className="block py-2 text-white hover:text-groop-blue"
+              onClick={() => setIsMobileMenuOpen(false)}
             >
               Blog
-            </button>
+            </Link>
             <div className="flex flex-col gap-3 pt-2">
               {user ? (
                 <>

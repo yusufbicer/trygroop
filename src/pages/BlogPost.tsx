@@ -1,18 +1,20 @@
-
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import Navbar from '@/components/layout/Navbar';
-import Footer from '@/components/layout/Footer';
-import { ChevronLeft, Calendar, User } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { BlogPost } from '@/types/blog';
+import { format } from 'date-fns';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 const BlogPost = () => {
   const { slug } = useParams<{ slug: string }>();
+  const [post, setPost] = useState<BlogPost | null>(null);
 
-  const { data: post, isLoading } = useQuery({
-    queryKey: ['blog-post', slug],
-    queryFn: async () => {
+  useEffect(() => {
+    const fetchPost = async () => {
+      if (!slug) return;
+
       const { data, error } = await supabase
         .from('blog_posts')
         .select(`
@@ -20,8 +22,11 @@ const BlogPost = () => {
           title,
           slug,
           content,
+          excerpt,
+          published,
           featured_image,
           created_at,
+          updated_at,
           published_at,
           author_id,
           profiles(first_name, last_name)
@@ -32,115 +37,118 @@ const BlogPost = () => {
 
       if (error) {
         console.error('Error fetching blog post:', error);
-        return null;
+        return;
       }
 
-      // Fix the author_name extraction to work with the profiles object structure
-      const profileData = data.profiles;
-      let authorName = 'Unknown';
-      
-      if (profileData && typeof profileData === 'object') {
-        const firstName = profileData.first_name || '';
-        const lastName = profileData.last_name || '';
-        authorName = `${firstName} ${lastName}`.trim();
-      }
+      // Fetch categories for the post
+      const { data: categoriesData } = await supabase
+        .from('blog_posts_categories')
+        .select(`
+          category_id,
+          blog_categories!inner(id, name, slug)
+        `)
+        .eq('post_id', data.id);
 
-      return {
+      const categories = categoriesData?.map(item => {
+        // Check if blog_categories exists and is an object
+        const categoryData = item.blog_categories;
+        if (categoryData && typeof categoryData === 'object') {
+          return {
+            id: categoryData.id || null,
+            name: categoryData.name || null,
+            slug: categoryData.slug || null
+          };
+        }
+        return { id: null, name: null, slug: null };
+      }) || [];
+
+      // Fetch tags for the post
+      const { data: tagsData } = await supabase
+        .from('blog_posts_tags')
+        .select(`
+          tag_id,
+          blog_tags!inner(id, name, slug)
+        `)
+        .eq('post_id', data.id);
+
+      const tags = tagsData?.map(item => {
+        // Check if blog_tags exists and is an object
+        const tagData = item.blog_tags;
+        if (tagData && typeof tagData === 'object') {
+          return {
+            id: tagData.id || null,
+            name: tagData.name || null,
+            slug: tagData.slug || null
+          };
+        }
+        return { id: null, name: null, slug: null };
+      }) || [];
+
+      setPost({
         ...data,
-        author_name: authorName
-      };
-    }
-  });
+        categories,
+        tags
+      } as BlogPost);
+    };
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    }).format(date);
+    fetchPost();
+  }, [slug]);
+
+  // Fix the author name handling in the component
+  const authorName = () => {
+    if (!post?.profiles) return 'Unknown Author';
+    
+    const profileData = post.profiles;
+    if (profileData && typeof profileData === 'object') {
+      const firstName = profileData.first_name || '';
+      const lastName = profileData.last_name || '';
+      return `${firstName} ${lastName}`.trim() || 'Unknown Author';
+    }
+    
+    return 'Unknown Author';
   };
 
+  if (!post) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-groop-darker">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-groop-blue"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar />
-      
-      <main className="flex-grow pt-20">
-        <div className="max-w-4xl mx-auto px-4 py-12">
-          <div className="mb-8">
-            <Link to="/blog" className="inline-flex items-center text-gray-600 hover:text-primary mb-4">
-              <ChevronLeft size={16} className="mr-1" />
-              Back to all posts
-            </Link>
-            
-            <Link to="/" className="inline-flex items-center text-gray-600 hover:text-primary mb-4 ml-4">
-              <ChevronLeft size={16} className="mr-1" />
-              Back to home
-            </Link>
-          </div>
-          
-          {isLoading ? (
-            <div className="animate-pulse space-y-4">
-              <div className="h-8 bg-gray-200 rounded w-3/4"></div>
-              <div className="h-6 bg-gray-200 rounded w-1/2"></div>
-              <div className="h-64 bg-gray-200 rounded"></div>
-              <div className="space-y-2">
-                <div className="h-4 bg-gray-200 rounded"></div>
-                <div className="h-4 bg-gray-200 rounded"></div>
-                <div className="h-4 bg-gray-200 rounded"></div>
-                <div className="h-4 bg-gray-200 rounded w-4/5"></div>
-              </div>
-            </div>
-          ) : post ? (
-            <article>
-              <h1 className="text-4xl font-bold text-gray-900 mb-4">{post.title}</h1>
-              
-              <div className="flex items-center text-gray-600 mb-8">
-                <div className="flex items-center mr-6">
-                  <User size={16} className="mr-2" />
-                  <span>{post.author_name || 'Unknown'}</span>
-                </div>
-                <div className="flex items-center">
-                  <Calendar size={16} className="mr-2" />
-                  <span>{formatDate(post.published_at || post.created_at)}</span>
-                </div>
-              </div>
-              
-              {post.featured_image && (
-                <div className="mb-8">
-                  <img 
-                    src={post.featured_image} 
-                    alt={post.title} 
-                    className="w-full h-auto rounded-lg shadow-md"
-                  />
-                </div>
-              )}
-              
-              <div 
-                className="prose prose-lg max-w-none" 
-                dangerouslySetInnerHTML={{ __html: post.content }}
-              />
-              
-              <div className="mt-12 pt-6 border-t border-gray-200">
-                <Button asChild>
-                  <Link to="/blog">View All Posts</Link>
-                </Button>
-              </div>
-            </article>
-          ) : (
-            <div className="text-center py-12">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">Post Not Found</h2>
-              <p className="text-gray-600 mb-8">The blog post you're looking for doesn't exist or has been removed.</p>
-              <Button asChild>
-                <Link to="/blog">Browse All Posts</Link>
-              </Button>
+    <div className="container mx-auto py-12">
+      <Card className="glass">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-white">{post.title}</CardTitle>
+          <CardDescription className="text-white/70">
+            By {authorName()} | Published on {format(new Date(post.published_at || post.created_at), 'MMMM dd, yyyy')}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {post.categories && post.categories.length > 0 && (
+            <div className="flex items-center space-x-2">
+              {post.categories.map(category => (
+                <Badge key={category.id}>{category.name}</Badge>
+              ))}
             </div>
           )}
-        </div>
-      </main>
-      
-      <Footer />
+          {post.tags && post.tags.length > 0 && (
+            <div className="flex items-center space-x-2">
+              {post.tags.map(tag => (
+                <Badge key={tag.id}>{tag.name}</Badge>
+              ))}
+            </div>
+          )}
+          {post.featured_image && (
+            <img src={post.featured_image} alt={post.title} className="rounded-md" />
+          )}
+          <div className="text-white" dangerouslySetInnerHTML={{ __html: post.content }} />
+          <Link to="/blog" className="text-groop-blue hover:underline">
+            Back to Blog
+          </Link>
+        </CardContent>
+      </Card>
     </div>
   );
 };

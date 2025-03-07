@@ -108,10 +108,11 @@ const Auth = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Improved positioning and styling for auth errors */}
             {authError && (
-              <Alert variant="destructive" className="mb-6">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{authError}</AlertDescription>
+              <Alert variant="destructive" className="mb-6 border-red-500 bg-red-500/20 text-white">
+                <AlertCircle className="h-4 w-4 text-red-500" />
+                <AlertDescription className="text-sm font-medium">{authError}</AlertDescription>
               </Alert>
             )}
             
