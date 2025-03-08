@@ -150,24 +150,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           description: error.message,
           variant: "destructive"
         });
-        return false;
+      } else {
+        // Force clear session and user state
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        setIsAdmin(false);
+        
+        // Successfully signed out
+        toast({
+          title: "Signed out",
+          description: "You have been successfully signed out."
+        });
       }
-      
-      // Force clear session and user state
-      setSession(null);
-      setUser(null);
-      setProfile(null);
-      setIsAdmin(false);
-      
-      // Successfully signed out
-      toast({
-        title: "Signed out",
-        description: "You have been successfully signed out."
-      });
-      return true;
     } catch (error) {
       console.error("Unexpected error during sign out:", error);
-      return false;
     } finally {
       setLoading(false);
     }
