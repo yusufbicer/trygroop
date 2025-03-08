@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -110,13 +109,11 @@ const AdminDashboard = () => {
         
         if (error) throw error;
         
-        // Count orders by status
         const statusCounts: Record<string, number> = {};
         data.forEach((order: { status: string }) => {
           statusCounts[order.status] = (statusCounts[order.status] || 0) + 1;
         });
         
-        // Convert to array for chart
         return Object.entries(statusCounts).map(([status, count]) => ({
           status,
           count
@@ -133,14 +130,13 @@ const AdminDashboard = () => {
     enabled: isAdmin
   });
 
-  // Get recent orders
+  // Get recent orders with attachments count
   const { data: recentOrders = [], isLoading: isLoadingRecentOrders } = useQuery({
     queryKey: ['admin-recent-orders'],
     queryFn: async () => {
       if (!isAdmin) return [];
       
       try {
-        // Fix: Remove the profiles join and handle the user data separately
         const { data, error } = await supabase
           .from('orders')
           .select('id, title, status, created_at, user_id')
@@ -149,8 +145,7 @@ const AdminDashboard = () => {
         
         if (error) throw error;
         
-        // Now fetch profile information for each order's user_id
-        const ordersWithProfiles = await Promise.all(
+        const ordersWithDetails = await Promise.all(
           (data || []).map(async (order) => {
             const { data: profileData } = await supabase
               .from('profiles')
@@ -158,14 +153,24 @@ const AdminDashboard = () => {
               .eq('id', order.user_id)
               .single();
             
+            const { count: attachmentCount, error: attachmentError } = await supabase
+              .from('order_attachments')
+              .select('*', { count: 'exact', head: true })
+              .eq('order_id', order.id);
+            
+            if (attachmentError) {
+              console.error('Error fetching attachments:', attachmentError);
+            }
+            
             return {
               ...order,
-              profiles: profileData
+              profiles: profileData,
+              attachmentCount: attachmentCount || 0
             };
           })
         );
         
-        return ordersWithProfiles || [];
+        return ordersWithDetails || [];
       } catch (error: any) {
         toast({
           title: 'Error fetching recent orders',
@@ -374,6 +379,12 @@ const AdminDashboard = () => {
                           </span>
                           <span className="mx-2">•</span>
                           <span>{formatDate(order.created_at)}</span>
+                          {order.attachmentCount > 0 && (
+                            <>
+                              <span className="mx-2">•</span>
+                              <span className="text-groop-blue">{order.attachmentCount} attachment{order.attachmentCount !== 1 ? 's' : ''}</span>
+                            </>
+                          )}
                         </div>
                       </div>
                       <div className={`px-2 py-1 rounded text-xs font-medium

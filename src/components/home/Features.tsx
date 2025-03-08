@@ -37,7 +37,7 @@ const features = [
 
 const Features = () => {
   return (
-    <section id="features" className="py-20 bg-groop-darker relative">
+    <section id="features" className="py-20 bg-groop-darker relative z-0">
       <div className="absolute top-0 left-0 w-full h-20 bg-gradient-to-b from-groop-dark to-transparent"></div>
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

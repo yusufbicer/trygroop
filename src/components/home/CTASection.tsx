@@ -7,7 +7,7 @@ const CTASection = () => {
   const { user } = useAuth();
   
   return (
-    <section className="py-20 bg-groop-dark relative">
+    <section className="py-20 bg-groop-dark relative z-10">
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
         <div className="absolute top-1/3 right-1/4 w-64 h-64 rounded-full bg-groop-blue/5 blur-[100px]"></div>
         <div className="absolute bottom-1/4 left-1/3 w-80 h-80 rounded-full bg-groop-blue/5 blur-[120px]"></div>

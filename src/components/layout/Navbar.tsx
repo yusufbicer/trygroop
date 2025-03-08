@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X, User } from 'lucide-react';
+import { Menu, X, User, MessageSquare } from 'lucide-react';
 import { CustomButton } from '../ui/CustomButton';
 import { useAuth } from '@/context/AuthContext';
 
@@ -45,13 +45,13 @@ const Navbar = () => {
               <Link to="/" className="text-white/80 hover:text-white transition-colors">
                 Home
               </Link>
-              <Link to="/#features" className="text-white/80 hover:text-white transition-colors">
+              <a href="/#features" className="text-white/80 hover:text-white transition-colors">
                 Features
-              </Link>
-              <Link to="/#how-it-works" className="text-white/80 hover:text-white transition-colors">
+              </a>
+              <a href="/#how-it-works" className="text-white/80 hover:text-white transition-colors">
                 How It Works
-              </Link>
-              <Link to="/#blog" className="text-white/80 hover:text-white transition-colors">
+              </a>
+              <Link to="/blog" className="text-white/80 hover:text-white transition-colors">
                 Blog
               </Link>
               {user ? (
@@ -67,11 +67,10 @@ const Navbar = () => {
                 </>
               ) : (
                 <>
-                  <Link to="/auth">
-                    <CustomButton variant="secondary" size="sm">
-                      Sign In
-                    </CustomButton>
-                  </Link>
+                  <CustomButton variant="secondary" size="sm">
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    Chat With Us
+                  </CustomButton>
                   <Link to="/auth?tab=signup">
                     <CustomButton variant="primary" size="sm" isGlowing>
                       Get Started
@@ -109,22 +108,22 @@ const Navbar = () => {
             >
               Home
             </Link>
-            <Link
-              to="/#features"
+            <a
+              href="/#features"
               className="block py-2 text-white hover:text-groop-blue"
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Features
-            </Link>
-            <Link
-              to="/#how-it-works"
+            </a>
+            <a
+              href="/#how-it-works"
               className="block py-2 text-white hover:text-groop-blue"
               onClick={() => setIsMobileMenuOpen(false)}
             >
               How It Works
-            </Link>
+            </a>
             <Link
-              to="/#blog"
+              to="/blog"
               className="block py-2 text-white hover:text-groop-blue"
               onClick={() => setIsMobileMenuOpen(false)}
             >
@@ -155,15 +154,14 @@ const Navbar = () => {
                 </>
               ) : (
                 <>
-                  <Link to="/auth">
-                    <CustomButton
-                      variant="secondary"
-                      className="w-full"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Sign In
-                    </CustomButton>
-                  </Link>
+                  <CustomButton
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    Chat With Us
+                  </CustomButton>
                   <Link to="/auth?tab=signup">
                     <CustomButton
                       variant="primary"
