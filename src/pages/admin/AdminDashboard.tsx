@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,7 +8,7 @@ import {
   CardHeader, 
   CardTitle 
 } from '@/components/ui/card';
-import { UserPlus, PackageOpen, ShoppingBag, TruckIcon, Users, Paperclip } from 'lucide-react';
+import { UserPlus, PackageOpen, ShoppingBag, TruckIcon, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { CustomButton } from '@/components/ui/CustomButton';
 import { Link } from 'react-router-dom';
@@ -96,31 +95,6 @@ const AdminDashboard = () => {
     enabled: isAdmin
   });
 
-  // Count total attachments
-  const { data: attachmentsCount = 0, isLoading: isLoadingAttachments } = useQuery({
-    queryKey: ['admin-attachments-count'],
-    queryFn: async () => {
-      if (!isAdmin) return 0;
-      
-      try {
-        const { count, error } = await supabase
-          .from('order_attachments')
-          .select('*', { count: 'exact', head: true });
-        
-        if (error) throw error;
-        return count || 0;
-      } catch (error: any) {
-        toast({
-          title: 'Error fetching attachments count',
-          description: error.message,
-          variant: 'destructive',
-        });
-        return 0;
-      }
-    },
-    enabled: isAdmin
-  });
-
   // Get orders by status
   const { data: ordersByStatus = [], isLoading: isLoadingOrdersByStatus } = useQuery({
     queryKey: ['admin-orders-by-status'],
@@ -187,23 +161,11 @@ const AdminDashboard = () => {
             if (attachmentError) {
               console.error('Error fetching attachments:', attachmentError);
             }
-
-            // Get attachment details
-            const { data: attachments, error: attachmentsDetailError } = await supabase
-              .from('order_attachments')
-              .select('id, file_name, file_type')
-              .eq('order_id', order.id)
-              .limit(3);
-              
-            if (attachmentsDetailError) {
-              console.error('Error fetching attachment details:', attachmentsDetailError);
-            }
             
             return {
               ...order,
               profiles: profileData,
-              attachmentCount: attachmentCount || 0,
-              attachments: attachments || []
+              attachmentCount: attachmentCount || 0
             };
           })
         );
@@ -318,23 +280,23 @@ const AdminDashboard = () => {
 
         <Card className="glass">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Attachments</CardTitle>
+            <CardTitle className="text-lg">Pending Orders</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex justify-between items-center">
               <div className="text-3xl font-bold">
-                {isLoadingAttachments ? (
+                {isLoadingOrdersByStatus ? (
                   <div className="w-12 h-8 bg-white/10 animate-pulse rounded"></div>
                 ) : (
-                  attachmentsCount
+                  ordersByStatus.find((item) => item.status === 'pending')?.count || 0
                 )}
               </div>
               <div className="bg-yellow-500/20 p-3 rounded-full">
-                <Paperclip className="h-6 w-6 text-yellow-500" />
+                <PackageOpen className="h-6 w-6 text-yellow-500" />
               </div>
             </div>
             <div className="mt-2 text-sm text-white/60">
-              Uploaded files
+              Require attention
             </div>
           </CardContent>
         </Card>
@@ -417,33 +379,13 @@ const AdminDashboard = () => {
                           </span>
                           <span className="mx-2">•</span>
                           <span>{formatDate(order.created_at)}</span>
+                          {order.attachmentCount > 0 && (
+                            <>
+                              <span className="mx-2">•</span>
+                              <span className="text-groop-blue">{order.attachmentCount} attachment{order.attachmentCount !== 1 ? 's' : ''}</span>
+                            </>
+                          )}
                         </div>
-                        
-                        {/* Attachments section */}
-                        {order.attachmentCount > 0 && (
-                          <div className="mt-2">
-                            <div className="flex items-center text-sm text-groop-blue">
-                              <Paperclip className="h-3 w-3 mr-1" />
-                              <span>{order.attachmentCount} attachment{order.attachmentCount !== 1 ? 's' : ''}</span>
-                            </div>
-                            {order.attachments && order.attachments.length > 0 && (
-                              <div className="flex flex-wrap gap-2 mt-1">
-                                {order.attachments.map((attachment: any) => (
-                                  <div key={attachment.id} className="text-xs px-2 py-1 bg-groop-blue/10 rounded-full text-groop-blue border border-groop-blue/20">
-                                    {attachment.file_name.length > 15 
-                                      ? `${attachment.file_name.substring(0, 12)}...` 
-                                      : attachment.file_name}
-                                  </div>
-                                ))}
-                                {order.attachmentCount > 3 && (
-                                  <div className="text-xs px-2 py-1 bg-white/10 rounded-full text-white/70">
-                                    +{order.attachmentCount - 3} more
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
                       <div className={`px-2 py-1 rounded text-xs font-medium
                         ${order.status === 'pending' ? 'bg-yellow-500/20 text-yellow-500' : 

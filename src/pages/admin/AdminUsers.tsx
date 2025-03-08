@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useQuery } from '@tanstack/react-query';
 import {
   Card,
   CardContent,
@@ -26,10 +25,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Users, Search, MoreHorizontal, UserPlus, CheckCircle, XCircle, Shield, User } from 'lucide-react';
+import { Users, Search, MoreHorizontal, UserPlus, CheckCircle, XCircle, Shield } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 interface UserData {
   id: string;
@@ -41,62 +39,62 @@ interface UserData {
 }
 
 const AdminUsers = () => {
+  const [users, setUsers] = useState<UserData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
 
-  // Use React Query to fetch users instead of useEffect
-  const { data: users = [], isLoading } = useQuery({
-    queryKey: ['admin-users'],
-    queryFn: async () => {
-      try {
-        // Step 1: Fetch all profiles
-        const { data: profilesData, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name, created_at');
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
-        if (profilesError) throw profilesError;
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    try {
+      // Step 1: Fetch all profiles
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, created_at');
 
-        // Step 2: Fetch admin roles
-        const { data: rolesData, error: rolesError } = await supabase
-          .from('user_roles')
-          .select('user_id')
-          .eq('role', 'admin');
+      if (profilesError) throw profilesError;
 
-        if (rolesError) throw rolesError;
+      // Step 2: Fetch admin roles
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'admin');
 
-        // Convert admin roles to a map for faster lookup
-        const adminMap = new Map();
-        rolesData.forEach(role => {
-          adminMap.set(role.user_id, true);
-        });
+      if (rolesError) throw rolesError;
 
-        // Step 3: Fetch actual emails by querying each profile's auth data
-        // Since we can't access auth data directly, we'll use a placeholder
-        const combinedUsers = await Promise.all(profilesData.map(async (profile) => {
-          // In a real app, you'd fetch this from auth.users or a custom endpoint
-          // Here we're generating a placeholder email
-          const placeholderEmail = `user-${profile.id.substring(0, 8)}@example.com`;
-          
-          return {
-            ...profile,
-            email: placeholderEmail,
-            isAdmin: adminMap.has(profile.id)
-          };
-        }));
+      // Convert admin roles to a map for faster lookup
+      const adminMap = new Map();
+      rolesData.forEach(role => {
+        adminMap.set(role.user_id, true);
+      });
 
-        return combinedUsers;
-      } catch (error: any) {
-        console.error('Error fetching users:', error);
-        toast({
-          title: 'Error',
-          description: error.message || 'Failed to fetch users',
-          variant: 'destructive',
-        });
-        return [];
-      }
+      // Step 3: Fetch auth.users data for emails
+      // Since we can't access auth data directly from client, we'll mock the emails
+      const combinedUsers = profilesData.map(profile => ({
+        ...profile,
+        email: `user-${profile.id.substring(0, 8)}@example.com`, // Placeholder email
+        isAdmin: adminMap.has(profile.id)
+      }));
+
+      console.log("Fetched users:", combinedUsers);
+      
+      setUsers(combinedUsers);
+    } catch (error: any) {
+      console.error('Error fetching users:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to fetch users',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
     }
-  });
+  };
 
   const filteredUsers = users.filter(user =>
     (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -112,32 +110,6 @@ const AdminUsers = () => {
       day: 'numeric',
       year: 'numeric'
     }).format(date);
-  };
-
-  const getInitials = (firstName: string | null, lastName: string | null) => {
-    if (!firstName && !lastName) return 'U';
-    
-    let initials = '';
-    if (firstName) initials += firstName[0];
-    if (lastName) initials += lastName[0];
-    
-    return initials.toUpperCase();
-  };
-
-  const getAvatarColor = (userId: string) => {
-    // Generate a consistent color based on user ID
-    const colors = [
-      'bg-blue-500', 'bg-green-500', 'bg-purple-500', 
-      'bg-pink-500', 'bg-yellow-500', 'bg-indigo-500'
-    ];
-    
-    // Simple hash function to get a deterministic index
-    const hash = userId.split('').reduce((a, b) => {
-      a = ((a << 5) - a) + b.charCodeAt(0);
-      return a & a;
-    }, 0);
-    
-    return colors[Math.abs(hash) % colors.length];
   };
 
   const toggleAdminRole = async (userId: string, isCurrentlyAdmin: boolean) => {
@@ -168,10 +140,8 @@ const AdminUsers = () => {
         description: `User ${isCurrentlyAdmin ? 'removed from' : 'added to'} admin role`,
       });
 
-      // Invalidate the React Query cache to trigger a refetch
-      // Note: In a production app, you'd use queryClient.invalidateQueries(['admin-users'])
-      // Here we'll just refresh the page
-      window.location.reload();
+      // Refresh the users list
+      fetchUsers();
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -241,18 +211,9 @@ const AdminUsers = () => {
                 {filteredUsers.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">
-                      <div className="flex items-center space-x-3">
-                        <Avatar className={`h-8 w-8 ${getAvatarColor(user.id)}`}>
-                          <AvatarFallback>
-                            {getInitials(user.first_name, user.last_name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span>
-                          {user.first_name || user.last_name ? 
-                            `${user.first_name || ''} ${user.last_name || ''}` : 
-                            'No name'}
-                        </span>
-                      </div>
+                      {user.first_name || user.last_name ? 
+                        `${user.first_name || ''} ${user.last_name || ''}` : 
+                        'No name'}
                     </TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>{formatDate(user.created_at)}</TableCell>
@@ -262,9 +223,7 @@ const AdminUsers = () => {
                           <Shield className="mr-1 h-3 w-3" /> Admin
                         </Badge>
                       ) : (
-                        <Badge variant="outline">
-                          <User className="mr-1 h-3 w-3" /> User
-                        </Badge>
+                        <Badge>User</Badge>
                       )}
                     </TableCell>
                     <TableCell className="text-right">
