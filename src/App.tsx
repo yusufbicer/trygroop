@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -27,7 +28,6 @@ import AdminOrders from "./pages/admin/AdminOrders";
 import AdminOrderDetail from "./pages/admin/AdminOrderDetail";
 import AdminSuppliers from "./pages/admin/AdminSuppliers";
 import AdminBlog from "./pages/admin/AdminBlog";
-import SupabaseDiagnostic from "./pages/admin/SupabaseDiagnostic";
 
 // Blog pages
 import Blog from "./pages/Blog";
@@ -74,7 +74,6 @@ const App = () => (
               <Route path="orders/:id" element={<AdminOrderDetail />} />
               <Route path="suppliers" element={<AdminSuppliers />} />
               <Route path="blog" element={<AdminBlog />} />
-              <Route path="diagnostic" element={<SupabaseDiagnostic />} />
             </Route>
             
             {/* Catch-all route */}

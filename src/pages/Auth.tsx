@@ -1,139 +1,233 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+
+import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { useToast } from '@/hooks/use-toast';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { CustomButton } from '@/components/ui/CustomButton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+
+const loginSchema = z.object({
+  email: z.string().email({ message: 'Please enter a valid email address' }),
+  password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
+});
+
+const signupSchema = z.object({
+  first_name: z.string().min(1, { message: 'First name is required' }),
+  last_name: z.string().min(1, { message: 'Last name is required' }),
+  email: z.string().email({ message: 'Please enter a valid email address' }),
+  password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
+  confirmPassword: z.string().min(6, { message: 'Password must be at least 6 characters' }),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
+type SignupFormValues = z.infer<typeof signupSchema>;
 
 const Auth = () => {
-  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string; auth?: string }>({});
-  const { signIn, signUp } = useAuth();
-  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from?.pathname || '/dashboard';
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setErrors({});
-    setIsSubmitting(true);
+  // If user is already logged in, redirect to dashboard
+  if (user) {
+    navigate(from, { replace: true });
+    return null;
+  }
 
+  const loginForm = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+  });
+
+  const signupForm = useForm<SignupFormValues>({
+    resolver: zodResolver(signupSchema),
+    defaultValues: {
+      first_name: '',
+      last_name: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+    },
+  });
+
+  const onLogin = async (values: LoginFormValues) => {
+    setIsLoading(true);
     try {
-      if (authMode === 'signup') {
-        await signUp(email, password, { first_name: firstName, last_name: lastName });
-      } else {
-        await signIn(email, password);
-      }
-    } catch (error: any) {
-      // Position errors in a more visible way
-      console.error('Auth error:', error);
-      setErrors({
-        auth: error.message || 'Authentication failed. Please check your credentials.'
-      });
+      await signIn(values.email, values.password);
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
+    }
+  };
+
+  const onSignup = async (values: SignupFormValues) => {
+    setIsLoading(true);
+    try {
+      const { first_name, last_name, email, password } = values;
+      await signUp(email, password, { first_name, last_name });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-groop-darker py-12">
-      <Card className="w-full max-w-md glass">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl text-white font-semibold">{authMode === 'signin' ? 'Sign In' : 'Sign Up'}</CardTitle>
-          <CardDescription className="text-white/70">Enter your credentials to {authMode === 'signin' ? 'access your account' : 'create an account'}</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          {errors.auth && (
-            <div className="p-3 mb-4 rounded-md bg-red-500/20 border border-red-500 text-white">
-              <p className="text-sm font-medium">{errors.auth}</p>
+    <div className="min-h-screen flex flex-col bg-groop-darker">
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <Card className="w-full max-w-md glass">
+          <CardHeader className="space-y-1">
+            <div className="flex justify-center mb-6">
+              <Link to="/" className="text-groop-blue font-bold text-3xl">Groop</Link>
             </div>
-          )}
-          <form onSubmit={handleSubmit}>
-            <div className="grid gap-4">
-              {authMode === 'signup' && (
-                <>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="firstName" className="text-right">
-                      First Name
-                    </Label>
+            <CardTitle className="text-2xl font-bold text-center text-white">
+              Welcome to Groop
+            </CardTitle>
+            <CardDescription className="text-center text-white/70">
+              Your Turkish import consolidation platform
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="login" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="login">Login</TabsTrigger>
+                <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="login">
+                <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-4 mt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
                     <Input
-                      type="text"
-                      id="firstName"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      className="col-span-3"
+                      id="email"
+                      type="email"
+                      placeholder="Your email address"
+                      {...loginForm.register('email')}
                     />
+                    {loginForm.formState.errors.email && (
+                      <p className="text-sm text-red-500">{loginForm.formState.errors.email.message}</p>
+                    )}
                   </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="lastName" className="text-right">
-                      Last Name
-                    </Label>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="password">Password</Label>
+                    </div>
                     <Input
-                      type="text"
-                      id="lastName"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      className="col-span-3"
+                      id="password"
+                      type="password"
+                      placeholder="Your password"
+                      {...loginForm.register('password')}
                     />
+                    {loginForm.formState.errors.password && (
+                      <p className="text-sm text-red-500">{loginForm.formState.errors.password.message}</p>
+                    )}
                   </div>
-                </>
-              )}
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="email" className="text-right">
-                  Email
-                </Label>
-                <Input
-                  type="email"
-                  id="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="col-span-3"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="password" className="text-right">
-                  Password
-                </Label>
-                <Input
-                  type="password"
-                  id="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="col-span-3"
-                  required
-                />
-              </div>
-              <Button disabled={isSubmitting} type="submit" className="col-span-4">
-                {isSubmitting ? 'Submitting...' : authMode === 'signin' ? 'Sign In' : 'Sign Up'}
-              </Button>
-            </div>
-          </form>
-          <div className="text-center text-sm text-white/70">
-            {authMode === 'signin' ? (
-              <>
-                Don't have an account?{' '}
-                <Link to="/auth/signup" className="text-groop-blue hover:underline" onClick={() => setAuthMode('signup')}>
-                  Sign Up
-                </Link>
-              </>
-            ) : (
-              <>
-                Already have an account?{' '}
-                <Link to="/auth/signin" className="text-groop-blue hover:underline" onClick={() => setAuthMode('signin')}>
-                  Sign In
-                </Link>
-              </>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+                  
+                  <CustomButton 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={isLoading}
+                  >
+                    {isLoading ? 'Signing in...' : 'Sign In'}
+                  </CustomButton>
+                </form>
+              </TabsContent>
+              
+              <TabsContent value="signup">
+                <form onSubmit={signupForm.handleSubmit(onSignup)} className="space-y-4 mt-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="first_name">First Name</Label>
+                      <Input
+                        id="first_name"
+                        placeholder="First name"
+                        {...signupForm.register('first_name')}
+                      />
+                      {signupForm.formState.errors.first_name && (
+                        <p className="text-sm text-red-500">{signupForm.formState.errors.first_name.message}</p>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="last_name">Last Name</Label>
+                      <Input
+                        id="last_name"
+                        placeholder="Last name"
+                        {...signupForm.register('last_name')}
+                      />
+                      {signupForm.formState.errors.last_name && (
+                        <p className="text-sm text-red-500">{signupForm.formState.errors.last_name.message}</p>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-email">Email</Label>
+                    <Input
+                      id="signup-email"
+                      type="email"
+                      placeholder="Your email address"
+                      {...signupForm.register('email')}
+                    />
+                    {signupForm.formState.errors.email && (
+                      <p className="text-sm text-red-500">{signupForm.formState.errors.email.message}</p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-password">Password</Label>
+                    <Input
+                      id="signup-password"
+                      type="password"
+                      placeholder="Create a password"
+                      {...signupForm.register('password')}
+                    />
+                    {signupForm.formState.errors.password && (
+                      <p className="text-sm text-red-500">{signupForm.formState.errors.password.message}</p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-password">Confirm Password</Label>
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      placeholder="Confirm your password"
+                      {...signupForm.register('confirmPassword')}
+                    />
+                    {signupForm.formState.errors.confirmPassword && (
+                      <p className="text-sm text-red-500">{signupForm.formState.errors.confirmPassword.message}</p>
+                    )}
+                  </div>
+                  
+                  <CustomButton 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={isLoading}
+                  >
+                    {isLoading ? 'Creating account...' : 'Create Account'}
+                  </CustomButton>
+                </form>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+          <CardFooter className="flex justify-center">
+            <Link to="/" className="text-sm text-white/70 hover:text-white transition-colors">
+              Back to Home
+            </Link>
+          </CardFooter>
+        </Card>
+      </div>
     </div>
   );
 };

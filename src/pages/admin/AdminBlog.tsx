@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAdminBlog } from '@/hooks/useBlog';
+import { useBlog } from '@/hooks/useBlog';
 import { BlogPost, Category, Tag } from '@/types/blog';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { 
   Card, 
   CardContent, 
@@ -60,17 +59,14 @@ import {
   FileText,
   Eye,
   EyeOff,
-  Search,
-  AlertCircle,
-  RefreshCw
+  Search
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const AdminBlog = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, isAdmin, makeAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { 
     allPosts, 
     categories, 
@@ -81,8 +77,9 @@ const AdminBlog = () => {
     deletePost,
     createCategory,
     createTag
-  } = useAdminBlog();
+  } = useBlog();
 
+  // Form state for posts
   const [postForm, setPostForm] = useState({
     title: '',
     slug: '',
@@ -94,162 +91,25 @@ const AdminBlog = () => {
     selectedTags: [] as string[]
   });
 
+  // Form state for categories and tags
   const [categoryForm, setCategoryForm] = useState({ name: '', slug: '' });
   const [tagForm, setTagForm] = useState({ name: '', slug: '' });
 
+  // Modal states
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isTagModalOpen, setIsTagModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
+  // Currently editing state
   const [currentPostId, setCurrentPostId] = useState<string | null>(null);
   const [postToDelete, setPostToDelete] = useState<string | null>(null);
 
+  // Search and filter state
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft'>('all');
-  const [error, setError] = useState<string | null>(null);
-  const [isCreatingTables, setIsCreatingTables] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      // Force admin status for the current user to ensure access
-      makeAdmin(user.id).then(() => {
-        ensureBlogTablesExist();
-      });
-    }
-  }, [user]);
-
-  const ensureBlogTablesExist = async () => {
-    try {
-      setIsCreatingTables(true);
-      setError(null);
-      
-      // Check if blog_posts table exists
-      const { error: checkError } = await supabase
-        .from('blog_posts')
-        .select('count(*)', { count: 'exact', head: true });
-      
-      if (checkError && checkError.code === '42P01') { // Table doesn't exist
-        console.log("Blog tables don't exist. Creating them now...");
-        
-        // Try to execute the SQL function to create tables
-        const { error: funcError } = await supabase.rpc(
-          'create_blog_tables'
-        );
-        
-        if (funcError) {
-          console.error("Error calling create_blog_tables function:", funcError);
-          
-          // Try direct SQL execution
-          const { error: sqlError } = await supabase.rpc(
-            'exec_sql',
-            { 
-              sql: `
-                -- Create blog_posts table
-                CREATE TABLE IF NOT EXISTS public.blog_posts (
-                  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                  title TEXT NOT NULL,
-                  slug TEXT NOT NULL UNIQUE,
-                  content TEXT NOT NULL,
-                  excerpt TEXT,
-                  featured_image TEXT,
-                  published BOOLEAN DEFAULT false,
-                  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-                  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-                  published_at TIMESTAMP WITH TIME ZONE,
-                  author_id UUID REFERENCES auth.users(id) ON DELETE CASCADE
-                );
-                
-                -- Create blog_categories table
-                CREATE TABLE IF NOT EXISTS public.blog_categories (
-                  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                  name TEXT NOT NULL,
-                  slug TEXT NOT NULL UNIQUE,
-                  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-                );
-                
-                -- Create blog_tags table
-                CREATE TABLE IF NOT EXISTS public.blog_tags (
-                  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                  name TEXT NOT NULL,
-                  slug TEXT NOT NULL UNIQUE,
-                  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-                );
-                
-                -- Create blog_posts_categories junction table
-                CREATE TABLE IF NOT EXISTS public.blog_posts_categories (
-                  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                  post_id UUID REFERENCES public.blog_posts(id) ON DELETE CASCADE,
-                  category_id UUID REFERENCES public.blog_categories(id) ON DELETE CASCADE,
-                  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-                  UNIQUE(post_id, category_id)
-                );
-                
-                -- Create blog_posts_tags junction table
-                CREATE TABLE IF NOT EXISTS public.blog_posts_tags (
-                  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                  post_id UUID REFERENCES public.blog_posts(id) ON DELETE CASCADE,
-                  tag_id UUID REFERENCES public.blog_tags(id) ON DELETE CASCADE,
-                  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-                  UNIQUE(post_id, tag_id)
-                );
-                
-                -- Create some default categories
-                INSERT INTO public.blog_categories (name, slug)
-                SELECT 'News', 'news'
-                WHERE NOT EXISTS (SELECT 1 FROM public.blog_categories LIMIT 1);
-                
-                INSERT INTO public.blog_categories (name, slug)
-                SELECT 'Updates', 'updates'
-                WHERE NOT EXISTS (SELECT 1 FROM public.blog_categories LIMIT 1);
-                
-                INSERT INTO public.blog_categories (name, slug)
-                SELECT 'Tutorials', 'tutorials'
-                WHERE NOT EXISTS (SELECT 1 FROM public.blog_categories LIMIT 1);
-                
-                -- Create some default tags
-                INSERT INTO public.blog_tags (name, slug)
-                SELECT 'Featured', 'featured'
-                WHERE NOT EXISTS (SELECT 1 FROM public.blog_tags LIMIT 1);
-                
-                INSERT INTO public.blog_tags (name, slug)
-                SELECT 'Important', 'important'
-                WHERE NOT EXISTS (SELECT 1 FROM public.blog_tags LIMIT 1);
-              `
-            }
-          );
-          
-          if (sqlError) {
-            console.error("Error creating blog tables with SQL:", sqlError);
-            setError("Failed to create blog tables. Please contact support.");
-            toast({
-              title: "Error",
-              description: "Failed to create blog tables. Please try again later.",
-              variant: "destructive"
-            });
-          } else {
-            console.log("Successfully created blog tables with direct SQL");
-            toast({
-              title: "Success",
-              description: "Blog tables created successfully.",
-            });
-          }
-        } else {
-          console.log("Successfully created blog tables with function");
-          toast({
-            title: "Success",
-            description: "Blog tables created successfully.",
-          });
-        }
-      }
-    } catch (error: any) {
-      console.error("Error in ensureBlogTablesExist:", error);
-      setError(error.message || "Failed to check or create blog tables");
-    } finally {
-      setIsCreatingTables(false);
-    }
-  };
-
+  // Filtered posts based on search and status filter
   const filteredPosts = allPosts.filter(post => {
     const matchesSearch = 
       post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -263,6 +123,7 @@ const AdminBlog = () => {
     return matchesSearch && matchesStatus;
   });
 
+  // Generate a slug from the title
   const generateSlug = (title: string) => {
     return title
       .toLowerCase()
@@ -270,6 +131,7 @@ const AdminBlog = () => {
       .replace(/\s+/g, '-');
   };
 
+  // Reset the post form
   const resetPostForm = () => {
     setPostForm({
       title: '',
@@ -284,11 +146,13 @@ const AdminBlog = () => {
     setCurrentPostId(null);
   };
 
+  // Function to open the post form for a new post
   const handleNewPost = () => {
     resetPostForm();
     setIsPostModalOpen(true);
   };
 
+  // Function to open the post form for editing
   const handleEditPost = (post: BlogPost) => {
     setPostForm({
       title: post.title,
@@ -304,6 +168,7 @@ const AdminBlog = () => {
     setIsPostModalOpen(true);
   };
 
+  // Function to handle post form submission
   const handlePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -318,15 +183,11 @@ const AdminBlog = () => {
     }
 
     try {
+      // Generate slug if not provided
       const slug = postForm.slug || generateSlug(postForm.title);
-      
-      // Show loading toast
-      toast({
-        title: currentPostId ? 'Updating post...' : 'Creating post...',
-        description: 'Please wait while we save your post.',
-      });
 
       if (currentPostId) {
+        // Update existing post
         await updatePost.mutateAsync({
           id: currentPostId,
           post: {
@@ -336,19 +197,14 @@ const AdminBlog = () => {
             excerpt: postForm.excerpt || null,
             featured_image: postForm.featured_image || null,
             published: postForm.published,
-            author_id: user.id,
-            updated_at: new Date().toISOString()
+            author_id: user.id
           },
           categoryIds: postForm.selectedCategories,
           tagIds: postForm.selectedTags
         });
-        
-        toast({
-          title: 'Success!',
-          description: 'Your post has been updated successfully.',
-        });
       } else {
-        const result = await createPost.mutateAsync({
+        // Create new post
+        await createPost.mutateAsync({
           post: {
             title: postForm.title,
             slug,
@@ -357,34 +213,21 @@ const AdminBlog = () => {
             featured_image: postForm.featured_image || null,
             published: postForm.published,
             author_id: user.id,
-            published_at: postForm.published ? new Date().toISOString() : null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            published_at: postForm.published ? new Date().toISOString() : null
           },
           categoryIds: postForm.selectedCategories,
           tagIds: postForm.selectedTags
         });
-        
-        if (result) {
-          toast({
-            title: 'Success!',
-            description: 'Your post has been created successfully.',
-          });
-        }
       }
 
       resetPostForm();
       setIsPostModalOpen(false);
     } catch (error) {
       console.error('Error saving post:', error);
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to save post. Please try again.',
-        variant: 'destructive'
-      });
     }
   };
 
+  // Function to handle category form submission
   const handleCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -398,6 +241,7 @@ const AdminBlog = () => {
     }
 
     try {
+      // Generate slug if not provided
       const slug = categoryForm.slug || generateSlug(categoryForm.name);
 
       await createCategory.mutateAsync({
@@ -412,6 +256,7 @@ const AdminBlog = () => {
     }
   };
 
+  // Function to handle tag form submission
   const handleTagSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -425,6 +270,7 @@ const AdminBlog = () => {
     }
 
     try {
+      // Generate slug if not provided
       const slug = tagForm.slug || generateSlug(tagForm.name);
 
       await createTag.mutateAsync({
@@ -439,6 +285,7 @@ const AdminBlog = () => {
     }
   };
 
+  // Function to handle post deletion
   const handleDeletePost = async () => {
     if (!postToDelete) return;
 
@@ -451,11 +298,13 @@ const AdminBlog = () => {
     }
   };
 
+  // Function to open the delete confirmation dialog
   const confirmDeletePost = (postId: string) => {
     setPostToDelete(postId);
     setIsDeleteDialogOpen(true);
   };
 
+  // Format date for display
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('en-US', {
@@ -465,53 +314,30 @@ const AdminBlog = () => {
     }).format(date);
   };
 
-  if (!user) {
+  if (!isAdmin) {
     return (
-      <Alert variant="destructive" className="mb-6">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Access Denied</AlertTitle>
-        <AlertDescription>
-          You must be logged in to view this page.
-        </AlertDescription>
-      </Alert>
+      <div className="container mx-auto py-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Access Denied</CardTitle>
+            <CardDescription>
+              You do not have permission to access this page.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
     );
   }
 
   return (
     <div className="container mx-auto py-6 space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-white mb-1">Blog Management</h1>
-          <p className="text-white/70">Create and manage your blog content</p>
-        </div>
-        <div className="flex gap-2 mt-4 sm:mt-0">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={ensureBlogTablesExist} 
-            disabled={isCreatingTables}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isCreatingTables ? 'animate-spin' : ''}`} />
-            {isCreatingTables ? 'Creating Tables...' : 'Refresh'}
-          </Button>
-          <Button 
-            variant="default" 
-            size="sm" 
-            onClick={handleNewPost}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Post
-          </Button>
-        </div>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold tracking-tight">Blog Management</h1>
+        <Button onClick={handleNewPost}>
+          <Plus className="mr-2 h-4 w-4" />
+          New Post
+        </Button>
       </div>
-
-      {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
 
       <Tabs defaultValue="posts">
         <TabsList>
@@ -729,6 +555,7 @@ const AdminBlog = () => {
         </TabsContent>
       </Tabs>
 
+      {/* Post Form Dialog */}
       <Dialog open={isPostModalOpen} onOpenChange={setIsPostModalOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
@@ -896,6 +723,7 @@ const AdminBlog = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Category Form Dialog */}
       <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
         <DialogContent>
           <DialogHeader>
@@ -953,6 +781,7 @@ const AdminBlog = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Tag Form Dialog */}
       <Dialog open={isTagModalOpen} onOpenChange={setIsTagModalOpen}>
         <DialogContent>
           <DialogHeader>
@@ -1010,6 +839,7 @@ const AdminBlog = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>

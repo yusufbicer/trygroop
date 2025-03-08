@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,17 +20,8 @@ import { Calendar, Tag as TagIcon, Folder, Search, User, ArrowRight } from 'luci
 
 const Blog = () => {
   // Use the useBlog hook
-  const { data: posts = [], isLoading, error } = useBlog();
+  const { posts, categories, tags, isLoading } = useBlog();
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // Get categories and tags from posts
-  const allCategories = Array.from(
-    new Set(posts.flatMap(post => post.categories.map(cat => JSON.stringify(cat))))
-  ).map(cat => JSON.parse(cat));
-  
-  const allTags = Array.from(
-    new Set(posts.flatMap(post => post.tags.map(tag => JSON.stringify(tag))))
-  ).map(tag => JSON.parse(tag));
   
   // Filter posts based on search
   const filteredPosts = posts.filter(post => 
@@ -45,20 +37,6 @@ const Blog = () => {
       day: 'numeric'
     }).format(date);
   };
-
-  if (error) {
-    return (
-      <div className="container mx-auto py-12 text-center">
-        <h2 className="text-2xl font-bold mb-4">Error Loading Blog Posts</h2>
-        <p className="text-gray-600 mb-6">
-          We encountered an error while loading the blog posts. Please try again later.
-        </p>
-        <pre className="bg-gray-100 p-4 rounded text-left overflow-auto max-w-2xl mx-auto">
-          {error instanceof Error ? error.message : 'Unknown error'}
-        </pre>
-      </div>
-    );
-  }
 
   return (
     <div className="container mx-auto py-12">
@@ -171,15 +149,12 @@ const Blog = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {allCategories.map(category => (
+                {categories.map(category => (
                   <div key={category.id} className="flex items-center gap-2">
                     <Folder className="h-4 w-4 text-gray-500" />
                     <span>{category.name}</span>
                   </div>
                 ))}
-                {allCategories.length === 0 && (
-                  <p className="text-gray-500 text-sm">No categories found</p>
-                )}
               </div>
             </CardContent>
           </Card>
@@ -191,14 +166,11 @@ const Blog = () => {
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
-                {allTags.map(tag => (
+                {tags.map(tag => (
                   <Badge key={tag.id} variant="secondary">
                     {tag.name}
                   </Badge>
                 ))}
-                {allTags.length === 0 && (
-                  <p className="text-gray-500 text-sm">No tags found</p>
-                )}
               </div>
             </CardContent>
           </Card>

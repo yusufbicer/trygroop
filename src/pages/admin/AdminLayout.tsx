@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -11,8 +12,7 @@ import {
   X,
   Home,
   FileEdit,
-  PenLine,
-  Database
+  PenLine
 } from 'lucide-react';
 
 const AdminLayout = () => {
@@ -84,14 +84,6 @@ const AdminLayout = () => {
             >
               <PenLine className="h-5 w-5 mr-3" />
               <span>Blog</span>
-            </Link>
-            
-            <Link 
-              to="/admin/diagnostic" 
-              className="flex items-center px-3 py-2 text-white/80 hover:bg-white/5 rounded-md transition-colors"
-            >
-              <Database className="h-5 w-5 mr-3" />
-              <span>Database Diagnostic</span>
             </Link>
           </div>
           
@@ -189,15 +181,6 @@ const AdminLayout = () => {
             >
               <PenLine className="h-5 w-5 mr-3" />
               <span>Blog</span>
-            </Link>
-            
-            <Link 
-              to="/admin/diagnostic" 
-              className="flex items-center px-3 py-2 text-white/80 hover:bg-white/5 rounded-md transition-colors"
-              onClick={closeMobileMenu}
-            >
-              <Database className="h-5 w-5 mr-3" />
-              <span>Database Diagnostic</span>
             </Link>
           </div>
           

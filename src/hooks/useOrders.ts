@@ -5,46 +5,6 @@ import { Order, Suborder, Tracking, Payment } from '@/types/data';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 
-// Sample orders data for when the database is not accessible
-const sampleOrders = [
-  {
-    id: '1',
-    user_id: 'sample-user-1',
-    title: 'Premium Subscription Order',
-    product_name: 'Premium Subscription',
-    amount: 29.99,
-    status: 'completed',
-    details: 'Sample order details for premium subscription',
-    total_volume: 10,
-    created_at: new Date(Date.now() - 86400000 * 2).toISOString(), // 2 days ago
-    updated_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-  },
-  {
-    id: '2',
-    user_id: 'sample-user-2',
-    title: 'Basic Subscription Order',
-    product_name: 'Basic Subscription',
-    amount: 9.99,
-    status: 'pending',
-    details: 'Sample order details for basic subscription',
-    total_volume: 5,
-    created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-    updated_at: new Date(Date.now() - 86400000).toISOString(),
-  },
-  {
-    id: '3',
-    user_id: 'sample-user-3',
-    title: 'Enterprise Plan Order',
-    product_name: 'Enterprise Plan',
-    amount: 99.99,
-    status: 'completed',
-    details: 'Sample order details for enterprise plan',
-    total_volume: 20,
-    created_at: new Date().toISOString(), // today
-    updated_at: new Date().toISOString(),
-  },
-];
-
 export const useOrders = (userId?: string) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -66,22 +26,15 @@ export const useOrders = (userId?: string) => {
         const { data, error } = await query.order('created_at', { ascending: false });
         
         if (error) {
-          console.error('Error fetching orders:', error);
-          
-          if (error.code === '42P01') { // Table doesn't exist
-            console.log('Orders table does not exist, returning sample data');
-            return sampleOrders;
-          }
-          
           toast({
             title: 'Error fetching orders',
             description: error.message,
             variant: 'destructive',
           });
-          return sampleOrders;
+          return [];
         }
         
-        return data && data.length > 0 ? data : sampleOrders;
+        return data || [];
       } catch (error: any) {
         console.error('Error in useOrders:', error);
         toast({
@@ -89,7 +42,7 @@ export const useOrders = (userId?: string) => {
           description: error.message,
           variant: 'destructive',
         });
-        return sampleOrders;
+        return [];
       }
     },
     enabled: isAdmin || !!userId,
@@ -98,20 +51,6 @@ export const useOrders = (userId?: string) => {
   // Fetch a single order with all related data
   const fetchOrderWithDetails = async (orderId: string) => {
     try {
-      // Check if this is a sample order ID
-      const sampleOrder = sampleOrders.find(order => order.id === orderId);
-      if (sampleOrder) {
-        console.log('Returning sample order details for ID:', orderId);
-        return {
-          ...sampleOrder,
-          profile: { first_name: 'Sample', last_name: 'User' },
-          suborders: [],
-          tracking: [],
-          payments: [],
-          attachments: []
-        };
-      }
-      
       // Get order
       const { data: order, error: orderError } = await supabase
         .from('orders')
@@ -119,26 +58,7 @@ export const useOrders = (userId?: string) => {
         .eq('id', orderId)
         .single();
         
-      if (orderError) {
-        console.error('Error fetching order:', orderError);
-        
-        if (orderError.code === '42P01' || orderError.code === 'PGRST116') {
-          // Table doesn't exist or no rows returned
-          console.log('Order not found, returning sample order');
-          const fallbackOrder = sampleOrders[0];
-          return {
-            ...fallbackOrder,
-            id: orderId,
-            profile: { first_name: 'Sample', last_name: 'User' },
-            suborders: [],
-            tracking: [],
-            payments: [],
-            attachments: []
-          };
-        }
-        
-        throw orderError;
-      }
+      if (orderError) throw orderError;
       
       // Get user profile for the order
       const { data: userProfile, error: profileError } = await supabase
@@ -151,100 +71,58 @@ export const useOrders = (userId?: string) => {
         console.error('Error fetching user profile:', profileError);
       }
       
-      // Try to get suborders
-      let suborders = [];
-      try {
-        const { data: subordersData, error: subordersError } = await supabase
-          .from('suborders')
-          .select(`
-            *,
-            suppliers:supplier_id (
-              name
-            )
-          `)
-          .eq('order_id', orderId);
-          
-        if (!subordersError) {
-          suborders = subordersData || [];
-        }
-      } catch (error) {
-        console.error('Error fetching suborders:', error);
-      }
+      // Get suborders
+      const { data: suborders, error: subordersError } = await supabase
+        .from('suborders')
+        .select(`
+          *,
+          suppliers:supplier_id (
+            name
+          )
+        `)
+        .eq('order_id', orderId);
         
-      // Try to get tracking information
-      let tracking = [];
-      try {
-        const { data: trackingData, error: trackingError } = await supabase
-          .from('tracking')
-          .select('*')
-          .eq('order_id', orderId)
-          .order('created_at', { ascending: false });
-          
-        if (!trackingError) {
-          tracking = trackingData || [];
-        }
-      } catch (error) {
-        console.error('Error fetching tracking:', error);
-      }
+      // Get tracking information
+      const { data: tracking, error: trackingError } = await supabase
+        .from('tracking')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: false });
         
-      // Try to get payment information
-      let payments = [];
-      try {
-        const { data: paymentsData, error: paymentsError } = await supabase
-          .from('payments')
-          .select('*')
-          .eq('order_id', orderId)
-          .order('created_at', { ascending: false });
-          
-        if (!paymentsError) {
-          payments = paymentsData || [];
-        }
-      } catch (error) {
-        console.error('Error fetching payments:', error);
-      }
+      // Get payment information
+      const { data: payments, error: paymentsError } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: false });
+        
+      // Get order attachments
+      const { data: attachments, error: attachmentsError } = await supabase
+        .from('order_attachments')
+        .select('*')
+        .eq('order_id', orderId);
       
-      // Try to get order attachments
-      let attachments = [];
-      try {
-        const { data: attachmentsData, error: attachmentsError } = await supabase
-          .from('order_attachments')
-          .select('*')
-          .eq('order_id', orderId);
-          
-        if (!attachmentsError) {
-          attachments = attachmentsData || [];
-        }
-      } catch (error) {
-        console.error('Error fetching attachments:', error);
+      if (subordersError || trackingError || paymentsError || attachmentsError) {
+        console.error("Errors fetching related data:", {
+          subordersError, trackingError, paymentsError, attachmentsError
+        });
       }
       
       return {
         ...order,
         profile: userProfile || { first_name: null, last_name: null },
-        suborders: suborders,
-        tracking: tracking,
-        payments: payments,
-        attachments: attachments
+        suborders: suborders || [],
+        tracking: tracking || [],
+        payments: payments || [],
+        attachments: attachments || []
       };
     } catch (error: any) {
-      console.error('Error in fetchOrderWithDetails:', error);
       toast({
         title: 'Error fetching order details',
         description: error.message,
         variant: 'destructive',
       });
-      
-      // Return a sample order as fallback
-      const fallbackOrder = sampleOrders[0];
-      return {
-        ...fallbackOrder,
-        id: orderId || fallbackOrder.id,
-        profile: { first_name: 'Sample', last_name: 'User' },
-        suborders: [],
-        tracking: [],
-        payments: [],
-        attachments: []
-      };
+      return null;
     }
   };
 

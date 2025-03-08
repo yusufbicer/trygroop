@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -56,23 +57,17 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
-				// Groop custom colors - Futuristic AI Theme
+				// Groop custom colors
 				groop: {
-					dark: '#0A1A2F',
-					darker: '#061425',
-					darkest: '#030A1A',
-					blue: '#00B4FF',
-					'blue-light': '#5CE5FF',
-					'blue-dark': '#0077B6',
-					cyan: '#00E5FF',
-					purple: '#7B5CFF',
-					'purple-light': '#A78BFF',
-					accent: '#E0FBFC',
-					'accent-muted': '#9EAEBB',
-					surface: 'rgba(10, 26, 47, 0.7)',
-					'surface-hover': 'rgba(0, 180, 255, 0.1)',
-					neon: '#00F5FF',
-					glow: 'rgba(0, 229, 255, 0.5)',
+					dark: '#0A1929',
+					darker: '#060F18',
+					darkest: '#030A10',
+					blue: '#1E88E5',
+					'blue-light': '#64B5F6',
+					accent: '#E0E0E0',
+					'accent-muted': '#9E9E9E',
+					surface: 'rgba(255, 255, 255, 0.05)',
+					'surface-hover': 'rgba(255, 255, 255, 0.08)',
 				}
 			},
 			borderRadius: {
@@ -118,19 +113,11 @@ export default {
 				},
 				'glow-pulse': {
 					'0%, 100%': { 
-						boxShadow: '0 0 0 rgba(0, 229, 255, 0)',
+						boxShadow: '0 0 0 rgba(30, 136, 229, 0)',
 					},
 					'50%': { 
-						boxShadow: '0 0 30px rgba(0, 229, 255, 0.4)',
+						boxShadow: '0 0 20px rgba(30, 136, 229, 0.3)',
 					}
-				},
-				'float': {
-					'0%, 100%': { transform: 'translateY(0)' },
-					'50%': { transform: 'translateY(-10px)' }
-				},
-				'data-flow': {
-					'0%': { backgroundPosition: '0% 50%' },
-					'100%': { backgroundPosition: '100% 50%' }
 				},
 			},
 			animation: {
@@ -143,14 +130,10 @@ export default {
 				'slide-left': 'slide-left 0.4s ease-out',
 				'scale-up': 'scale-up 0.3s ease-out',
 				'glow-pulse': 'glow-pulse 2s infinite ease-in-out',
-				'float': 'float 6s ease-in-out infinite',
-				'data-flow': 'data-flow 15s linear infinite',
 			},
 			backgroundImage: {
 				'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-				'hero-pattern': 'radial-gradient(circle at 30% 20%, rgba(0, 229, 255, 0.15) 0%, rgba(10, 26, 47, 0) 40%), linear-gradient(to bottom, rgba(6, 20, 37, 0.95), rgba(3, 10, 26, 0.98))',
-				'cyber-grid': 'linear-gradient(rgba(0, 180, 255, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 180, 255, 0.1) 1px, transparent 1px)',
-				'data-stream': 'linear-gradient(90deg, rgba(0, 229, 255, 0) 0%, rgba(0, 229, 255, 0.1) 50%, rgba(0, 229, 255, 0) 100%)',
+				'hero-pattern': 'radial-gradient(circle at 30% 20%, rgba(30, 136, 229, 0.2) 0%, rgba(10, 25, 41, 0) 30%), linear-gradient(to bottom, rgba(6, 15, 24, 0.9), rgba(3, 10, 16, 0.95))',
 			},
 		}
 	},

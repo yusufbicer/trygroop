@@ -1,171 +1,150 @@
-
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import type { BlogPost as BlogPostType } from '@/types/blog';
-import { format } from 'date-fns';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { ArrowLeft } from 'lucide-react';
+import { useBlog } from '@/hooks/useBlog';
+import { BlogPost as BlogPostType } from '@/types/blog';
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardHeader, 
+  CardTitle 
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Calendar, Tag as TagIcon, Folder, User, ArrowLeft } from 'lucide-react';
 
 const BlogPost = () => {
   const { slug } = useParams<{ slug: string }>();
+  const { fetchPostBySlug, isLoading } = useBlog();
   const [post, setPost] = useState<BlogPostType | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchPost = async () => {
-      if (!slug) return;
-
-      const { data, error } = await supabase
-        .from('blog_posts')
-        .select(`
-          id,
-          title,
-          slug,
-          content,
-          excerpt,
-          published,
-          featured_image,
-          created_at,
-          updated_at,
-          published_at,
-          author_id,
-          profiles(first_name, last_name)
-        `)
-        .eq('slug', slug)
-        .eq('published', true)
-        .single();
-
-      if (error) {
-        console.error('Error fetching blog post:', error);
+    const loadPost = async () => {
+      if (!slug) {
+        setError('Post not found');
         return;
       }
 
-      // Fetch categories for the post
-      const { data: categoriesData } = await supabase
-        .from('blog_posts_categories')
-        .select(`
-          category_id,
-          blog_categories!inner(id, name, slug)
-        `)
-        .eq('post_id', data.id);
-
-      let categories = [];
-      if (categoriesData) {
-        categories = categoriesData.map(item => {
-          // Check if blog_categories exists and is an object
-          const categoryData = item.blog_categories;
-          if (categoryData && typeof categoryData === 'object') {
-            return {
-              id: categoryData.id || null,
-              name: categoryData.name || null,
-              slug: categoryData.slug || null
-            };
-          }
-          return { id: null, name: null, slug: null };
-        });
+      try {
+        const postData = await fetchPostBySlug(slug);
+        if (postData) {
+          setPost(postData);
+        } else {
+          setError('Post not found');
+        }
+      } catch (err: any) {
+        console.error('Error loading post:', err);
+        setError(err.message || 'Failed to load blog post');
       }
-
-      // Fetch tags for the post
-      const { data: tagsData } = await supabase
-        .from('blog_posts_tags')
-        .select(`
-          tag_id,
-          blog_tags!inner(id, name, slug)
-        `)
-        .eq('post_id', data.id);
-
-      let tags = [];
-      if (tagsData) {
-        tags = tagsData.map(item => {
-          // Check if blog_tags exists and is an object
-          const tagData = item.blog_tags;
-          if (tagData && typeof tagData === 'object') {
-            return {
-              id: tagData.id || null,
-              name: tagData.name || null,
-              slug: tagData.slug || null
-            };
-          }
-          return { id: null, name: null, slug: null };
-        });
-      }
-
-      const profileData = data.profiles;
-      const authorProfile = profileData && typeof profileData === 'object' ? profileData : null;
-
-      setPost({
-        ...data,
-        categories,
-        tags,
-        profiles: authorProfile
-      } as BlogPostType);
     };
 
-    fetchPost();
-  }, [slug]);
+    loadPost();
+  }, [slug, fetchPostBySlug]);
 
-  // Fix the author name handling in the component
-  const authorName = () => {
-    if (!post || !post.profiles) return 'Unknown Author';
-    
-    const profileData = post.profiles;
-    if (profileData && typeof profileData === 'object') {
-      const firstName = profileData.first_name || '';
-      const lastName = profileData.last_name || '';
-      return `${firstName} ${lastName}`.trim() || 'Unknown Author';
-    }
-    
-    return 'Unknown Author';
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    }).format(date);
   };
 
-  if (!post) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-groop-darker">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-groop-blue"></div>
+      <div className="container mx-auto py-12 flex justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (error || !post) {
+    return (
+      <div className="container mx-auto py-12">
+        <Card className="max-w-3xl mx-auto">
+          <CardHeader>
+            <CardTitle>Not Found</CardTitle>
+            <CardDescription>
+              {error || 'The blog post you are looking for does not exist.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link to="/blog">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Blog
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
     <div className="container mx-auto py-12">
-      <Card className="glass">
-        <CardHeader>
-          <div className="flex items-center mb-4">
-            <Link to="/blog" className="flex items-center text-groop-blue hover:underline mr-4">
-              <ArrowLeft className="h-4 w-4 mr-1" /> Back to Blog
-            </Link>
+      <Button asChild variant="outline" className="mb-8">
+        <Link to="/blog">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Blog
+        </Link>
+      </Button>
+
+      <article className="max-w-4xl mx-auto">
+        {post.featured_image && (
+          <div className="mb-8 rounded-lg overflow-hidden h-[400px]">
+            <img
+              src={post.featured_image}
+              alt={post.title}
+              className="w-full h-full object-cover"
+            />
           </div>
-          <CardTitle className="text-2xl font-bold text-white">{post.title}</CardTitle>
-          <CardDescription className="text-white/70">
-            By {authorName()} | Published on {format(new Date(post.published_at || post.created_at), 'MMMM dd, yyyy')}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {post.categories && post.categories.length > 0 && (
-            <div className="flex items-center space-x-2">
-              {post.categories.map(category => (
-                <Badge key={category.id}>{category.name}</Badge>
-              ))}
+        )}
+
+        <div className="mb-6">
+          <h1 className="text-4xl font-bold mb-4">{post.title}</h1>
+          
+          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+            <div className="flex items-center">
+              <Calendar className="mr-2 h-4 w-4" />
+              {formatDate(post.created_at)}
             </div>
-          )}
-          {post.tags && post.tags.length > 0 && (
-            <div className="flex items-center space-x-2">
-              {post.tags.map(tag => (
-                <Badge key={tag.id}>{tag.name}</Badge>
-              ))}
-            </div>
-          )}
-          {post.featured_image && (
-            <img src={post.featured_image} alt={post.title} className="rounded-md" />
-          )}
-          <div className="text-white" dangerouslySetInnerHTML={{ __html: post.content }} />
-          <Link to="/" className="text-groop-blue hover:underline block mt-8">
-            Back to Home
-          </Link>
-        </CardContent>
-      </Card>
+            
+            {post.author_name && (
+              <div className="flex items-center">
+                <User className="mr-2 h-4 w-4" />
+                {post.author_name}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 mb-6">
+          {post.categories.map((category, index) => (
+            <Badge key={index} variant="outline" className="flex items-center gap-1">
+              <Folder className="h-3 w-3" />
+              {category.name}
+            </Badge>
+          ))}
+          {post.tags.map((tag, index) => (
+            <Badge key={index} variant="secondary" className="flex items-center gap-1">
+              <TagIcon className="h-3 w-3" />
+              {tag.name}
+            </Badge>
+          ))}
+        </div>
+
+        <Separator className="mb-8" />
+
+        <div className="prose prose-lg max-w-none">
+          {/* This could be replaced with a markdown renderer */}
+          {post.content.split('\n').map((paragraph, idx) => (
+            <p key={idx}>{paragraph}</p>
+          ))}
+        </div>
+      </article>
     </div>
   );
 };

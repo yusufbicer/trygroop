@@ -1,532 +1,624 @@
+
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { BlogPost } from '@/types/blog';
+import { BlogPost, Category, Tag } from '@/types/blog';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/AuthContext';
 
-const fetchBlogs = async () => {
-  const { data, error } = await supabase
-    .from('blog_posts')
-    .select(`
-      id,
-      title,
-      slug,
-      content,
-      excerpt,
-      published,
-      featured_image,
-      created_at,
-      updated_at,
-      published_at,
-      author_id,
-      profiles(first_name, last_name),
-      blog_posts_categories(category_id, blog_categories(id, name, slug)),
-      blog_posts_tags(tag_id, blog_tags(id, name, slug))
-    `)
-    .eq('published', true)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching blog posts:', error);
-    throw error;
-  }
-
-  return data;
-};
-
-const fetchBlogPost = async (slug: string) => {
-  const { data, error } = await supabase
-    .from('blog_posts')
-    .select(`
-      id,
-      title,
-      slug,
-      content,
-      excerpt,
-      published,
-      featured_image,
-      created_at,
-      updated_at,
-      published_at,
-      author_id,
-      profiles(first_name, last_name),
-      blog_posts_categories(category_id, blog_categories(id, name, slug)),
-      blog_posts_tags(tag_id, blog_tags(id, name, slug))
-    `)
-    .eq('slug', slug)
-    .eq('published', true)
-    .single();
-
-  if (error) {
-    console.error('Error fetching blog post:', error);
-    throw error;
-  }
-
-  return data;
-};
-
-const getFormattedBlogs = (data: any[]) => {
-  return data.map((post) => {
-    // Process categories from blog_posts_categories relation
-    const categories = post.blog_posts_categories?.map((item: any) => {
-      if (item.blog_categories && typeof item.blog_categories === 'object') {
-        return {
-          id: item.blog_categories.id || null,
-          name: item.blog_categories.name || null,
-          slug: item.blog_categories.slug || null
-        };
-      }
-      return { id: null, name: null, slug: null };
-    }) || [];
-    
-    // Process tags from blog_posts_tags relation
-    const tags = post.blog_posts_tags?.map((item: any) => {
-      if (item.blog_tags && typeof item.blog_tags === 'object') {
-        return {
-          id: item.blog_tags.id || null,
-          name: item.blog_tags.name || null,
-          slug: item.blog_tags.slug || null
-        };
-      }
-      return { id: null, name: null, slug: null };
-    }) || [];
-
-    // Process author information
-    let authorName = 'Unknown Author';
-    if (post.profiles && typeof post.profiles === 'object') {
-      const firstName = post.profiles.first_name || '';
-      const lastName = post.profiles.last_name || '';
-      authorName = `${firstName} ${lastName}`.trim() || 'Unknown Author';
-    }
-
-    return {
-      ...post,
-      categories,
-      tags,
-      authorName
-    };
-  });
-};
-
-export const useBlogs = () => {
-  return useQuery({
-    queryKey: ['blogs'],
-    queryFn: async () => {
-      const data = await fetchBlogs();
-      return getFormattedBlogs(data || []);
-    },
-  });
-};
-
-export const useBlog = useBlogs; // Add alias for backward compatibility
-
-export const useAdminBlog = () => {
+export const useBlog = () => {
+  const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [loading, setLoading] = useState(false);
+  const { isAdmin } = useAuth();
 
-  // Fetch all blog posts for admin
-  const { data: allPostsData = [], isLoading, error } = useQuery({
-    queryKey: ['admin-blogs'],
+  // Fetch published blog posts
+  const { data: posts = [], isLoading: isLoadingPosts } = useQuery({
+    queryKey: ['blog_posts', 'published'],
     queryFn: async () => {
+      try {
+        // Type assertion to make TypeScript happy
+        const { data, error } = await supabase
+          .from('blog_posts')
+          .select('*')
+          .eq('published', true)
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        // Fetch author details
+        const enrichedPosts = await Promise.all(
+          (data || []).map(async (post) => {
+            // Get author info
+            const { data: authorData } = await supabase
+              .from('profiles')
+              .select('first_name, last_name')
+              .eq('id', post.author_id)
+              .single();
+            
+            // Get categories
+            const { data: categoriesData } = await supabase
+              .from('blog_posts_categories')
+              .select(`
+                category_id,
+                blog_categories:category_id(id, name, slug)
+              `)
+              .eq('post_id', post.id);
+            
+            // Get tags
+            const { data: tagsData } = await supabase
+              .from('blog_posts_tags')
+              .select(`
+                tag_id,
+                blog_tags:tag_id(id, name, slug)
+              `)
+              .eq('post_id', post.id);
+            
+            return {
+              ...post,
+              author_name: authorData ? `${authorData.first_name || ''} ${authorData.last_name || ''}`.trim() : '',
+              categories: categoriesData?.map(item => item.blog_categories) || [],
+              tags: tagsData?.map(item => item.blog_tags) || []
+            } as BlogPost;
+          })
+        );
+        
+        return enrichedPosts;
+      } catch (error: any) {
+        console.error('Error fetching blog posts:', error);
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to fetch blog posts',
+          variant: 'destructive',
+        });
+        return [];
+      }
+    }
+  });
+
+  // Fetch all blog posts (for admin)
+  const { data: allPosts = [], isLoading: isLoadingAllPosts } = useQuery({
+    queryKey: ['blog_posts', 'all'],
+    queryFn: async () => {
+      try {
+        if (!isAdmin) return [];
+        
+        const { data, error } = await supabase
+          .from('blog_posts')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        // Same enrichment as above
+        const enrichedPosts = await Promise.all(
+          (data || []).map(async (post) => {
+            // Get author info
+            const { data: authorData } = await supabase
+              .from('profiles')
+              .select('first_name, last_name')
+              .eq('id', post.author_id)
+              .single();
+            
+            // Get categories
+            const { data: categoriesData } = await supabase
+              .from('blog_posts_categories')
+              .select(`
+                category_id,
+                blog_categories:category_id(id, name, slug)
+              `)
+              .eq('post_id', post.id);
+            
+            // Get tags
+            const { data: tagsData } = await supabase
+              .from('blog_posts_tags')
+              .select(`
+                tag_id,
+                blog_tags:tag_id(id, name, slug)
+              `)
+              .eq('post_id', post.id);
+            
+            return {
+              ...post,
+              author_name: authorData ? `${authorData.first_name || ''} ${authorData.last_name || ''}`.trim() : '',
+              categories: categoriesData?.map(item => item.blog_categories) || [],
+              tags: tagsData?.map(item => item.blog_tags) || []
+            } as BlogPost;
+          })
+        );
+        
+        return enrichedPosts;
+      } catch (error: any) {
+        console.error('Error fetching all blog posts:', error);
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to fetch blog posts',
+          variant: 'destructive',
+        });
+        return [];
+      }
+    },
+    enabled: isAdmin
+  });
+
+  // Fetch a single blog post by slug
+  const fetchPostBySlug = async (slug: string): Promise<BlogPost | null> => {
+    try {
       const { data, error } = await supabase
         .from('blog_posts')
-        .select(`
-          id,
-          title,
-          slug,
-          content,
-          excerpt,
-          published,
-          featured_image,
-          created_at,
-          updated_at,
-          published_at,
-          author_id,
-          profiles(first_name, last_name),
-          blog_posts_categories(category_id, blog_categories(id, name, slug)),
-          blog_posts_tags(tag_id, blog_tags(id, name, slug))
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching admin blog posts:', error);
-        throw error;
-      }
-
-      return getFormattedBlogs(data || []);
-    },
-  });
-
-  // Fetch categories
-  const { data: categoriesData = [] } = useQuery({
-    queryKey: ['blog-categories'],
-    queryFn: getCategories,
-  });
-
-  // Fetch tags
-  const { data: tagsData = [] } = useQuery({
-    queryKey: ['blog-tags'],
-    queryFn: getTags,
-  });
-
-  // Create post mutation
-  const createPost = useMutation({
-    mutationFn: async ({ 
-      post, 
-      categoryIds, 
-      tagIds 
-    }: { 
-      post: Partial<BlogPost>; 
-      categoryIds: string[]; 
-      tagIds: string[]; 
-    }) => {
-      // Start a Supabase transaction
-      const { data: newPost, error: postError } = await supabase
-        .from('blog_posts')
-        .insert([post])
-        .select()
+        .select('*')
+        .eq('slug', slug)
         .single();
-
-      if (postError) {
-        console.error('Error creating blog post:', postError);
-        throw postError;
-      }
-
-      if (!newPost) {
-        throw new Error('Failed to create blog post: No data returned');
-      }
-
-      const postId = newPost.id;
-
-      // Add categories
-      if (categoryIds.length > 0) {
-        const categoryRelations = categoryIds.map(categoryId => ({
-          post_id: postId,
-          category_id: categoryId
-        }));
-
-        const { error: categoriesError } = await supabase
-          .from('blog_posts_categories')
-          .insert(categoryRelations);
-
-        if (categoriesError) {
-          console.error('Error adding categories to post:', categoriesError);
-          // Don't throw here, continue with tags
-        }
-      }
-
-      // Add tags
-      if (tagIds.length > 0) {
-        const tagRelations = tagIds.map(tagId => ({
-          post_id: postId,
-          tag_id: tagId
-        }));
-
-        const { error: tagsError } = await supabase
-          .from('blog_posts_tags')
-          .insert(tagRelations);
-
-        if (tagsError) {
-          console.error('Error adding tags to post:', tagsError);
-          // Don't throw here, post is already created
-        }
-      }
-
-      return newPost;
-    },
-    onSuccess: () => {
-      // Invalidate and refetch
-      queryClient.invalidateQueries({ queryKey: ['admin-blogs'] });
-      queryClient.invalidateQueries({ queryKey: ['blogs'] });
-    },
-  });
-
-  // Update post mutation
-  const updatePost = useMutation({
-    mutationFn: async ({ 
-      id, 
-      post, 
-      categoryIds, 
-      tagIds 
-    }: { 
-      id: string; 
-      post: Partial<BlogPost>; 
-      categoryIds: string[]; 
-      tagIds: string[]; 
-    }) => {
-      // Update the post
-      const { data: updatedPost, error: postError } = await supabase
-        .from('blog_posts')
-        .update(post)
-        .eq('id', id)
-        .select()
+      
+      if (error) throw error;
+      if (!data) return null;
+      
+      // Get author info
+      const { data: authorData } = await supabase
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('id', data.author_id)
         .single();
-
-      if (postError) {
-        console.error('Error updating blog post:', postError);
-        throw postError;
-      }
-
-      if (!updatedPost) {
-        throw new Error('Failed to update blog post: No data returned');
-      }
-
-      // Delete existing category relations
-      const { error: deleteCategoriesError } = await supabase
+      
+      // Get categories
+      const { data: categoriesData } = await supabase
         .from('blog_posts_categories')
-        .delete()
-        .eq('post_id', id);
-
-      if (deleteCategoriesError) {
-        console.error('Error removing existing categories:', deleteCategoriesError);
-        // Continue anyway
-      }
-
-      // Add new category relations
-      if (categoryIds.length > 0) {
-        const categoryRelations = categoryIds.map(categoryId => ({
-          post_id: id,
-          category_id: categoryId
-        }));
-
-        const { error: categoriesError } = await supabase
-          .from('blog_posts_categories')
-          .insert(categoryRelations);
-
-        if (categoriesError) {
-          console.error('Error updating categories:', categoriesError);
-          // Continue anyway
-        }
-      }
-
-      // Delete existing tag relations
-      const { error: deleteTagsError } = await supabase
+        .select(`
+          category_id,
+          blog_categories:category_id(name, slug)
+        `)
+        .eq('post_id', data.id);
+      
+      // Get tags
+      const { data: tagsData } = await supabase
         .from('blog_posts_tags')
-        .delete()
-        .eq('post_id', id);
+        .select(`
+          tag_id,
+          blog_tags:tag_id(name, slug)
+        `)
+        .eq('post_id', data.id);
+      
+      return {
+        ...data,
+        author_name: authorData ? `${authorData.first_name || ''} ${authorData.last_name || ''}`.trim() : '',
+        categories: categoriesData?.map(item => item.blog_categories) || [],
+        tags: tagsData?.map(item => item.blog_tags) || []
+      } as BlogPost;
+    } catch (error: any) {
+      console.error('Error fetching blog post by slug:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to fetch blog post',
+        variant: 'destructive',
+      });
+      return null;
+    }
+  };
 
-      if (deleteTagsError) {
-        console.error('Error removing existing tags:', deleteTagsError);
-        // Continue anyway
+  // Fetch a single blog post by ID
+  const fetchPostById = async (id: string): Promise<BlogPost | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('blog_posts')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) throw error;
+      if (!data) return null;
+      
+      // Get author info
+      const { data: authorData } = await supabase
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('id', data.author_id)
+        .single();
+      
+      // Get categories
+      const { data: categoriesData } = await supabase
+        .from('blog_posts_categories')
+        .select(`
+          category_id,
+          blog_categories:category_id(name, slug)
+        `)
+        .eq('post_id', data.id);
+      
+      // Get tags
+      const { data: tagsData } = await supabase
+        .from('blog_posts_tags')
+        .select(`
+          tag_id,
+          blog_tags:tag_id(name, slug)
+        `)
+        .eq('post_id', data.id);
+      
+      return {
+        ...data,
+        author_name: authorData ? `${authorData.first_name || ''} ${authorData.last_name || ''}`.trim() : '',
+        categories: categoriesData?.map(item => item.blog_categories) || [],
+        tags: tagsData?.map(item => item.blog_tags) || []
+      } as BlogPost;
+    } catch (error: any) {
+      console.error('Error fetching blog post by ID:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to fetch blog post',
+        variant: 'destructive',
+      });
+      return null;
+    }
+  };
+
+  // Fetch all categories
+  const { data: categories = [], isLoading: isLoadingCategories } = useQuery({
+    queryKey: ['blog_categories'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from('blog_categories')
+          .select('*')
+          .order('name');
+        
+        if (error) throw error;
+        return data || [];
+      } catch (error: any) {
+        console.error('Error fetching categories:', error);
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to fetch categories',
+          variant: 'destructive',
+        });
+        return [];
       }
-
-      // Add new tag relations
-      if (tagIds.length > 0) {
-        const tagRelations = tagIds.map(tagId => ({
-          post_id: id,
-          tag_id: tagId
-        }));
-
-        const { error: tagsError } = await supabase
-          .from('blog_posts_tags')
-          .insert(tagRelations);
-
-        if (tagsError) {
-          console.error('Error updating tags:', tagsError);
-          // Continue anyway
-        }
-      }
-
-      return updatedPost;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-blogs'] });
-      queryClient.invalidateQueries({ queryKey: ['blogs'] });
-    },
+    }
   });
 
-  // Delete post mutation
+  // Fetch all tags
+  const { data: tags = [], isLoading: isLoadingTags } = useQuery({
+    queryKey: ['blog_tags'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from('blog_tags')
+          .select('*')
+          .order('name');
+        
+        if (error) throw error;
+        return data || [];
+      } catch (error: any) {
+        console.error('Error fetching tags:', error);
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to fetch tags',
+          variant: 'destructive',
+        });
+        return [];
+      }
+    }
+  });
+
+  // Create blog post
+  const createPost = useMutation({
+    mutationFn: async ({
+      post,
+      categoryIds,
+      tagIds
+    }: {
+      post: Omit<BlogPost, 'id' | 'created_at' | 'updated_at' | 'categories' | 'tags'>;
+      categoryIds: string[];
+      tagIds: string[];
+    }) => {
+      setLoading(true);
+      try {
+        // 1. Insert the blog post
+        const { data: postData, error: postError } = await supabase
+          .from('blog_posts')
+          .insert({
+            title: post.title,
+            slug: post.slug,
+            content: post.content,
+            excerpt: post.excerpt,
+            published: post.published,
+            featured_image: post.featured_image,
+            author_id: post.author_id,
+            published_at: post.published ? new Date().toISOString() : null
+          })
+          .select()
+          .single();
+        
+        if (postError) throw postError;
+        
+        // 2. Insert category relationships
+        if (categoryIds.length > 0) {
+          const categoryRelations = categoryIds.map(categoryId => ({
+            post_id: postData.id,
+            category_id: categoryId
+          }));
+          
+          const { error: categoryError } = await supabase
+            .from('blog_posts_categories')
+            .insert(categoryRelations);
+          
+          if (categoryError) throw categoryError;
+        }
+        
+        // 3. Insert tag relationships
+        if (tagIds.length > 0) {
+          const tagRelations = tagIds.map(tagId => ({
+            post_id: postData.id,
+            tag_id: tagId
+          }));
+          
+          const { error: tagError } = await supabase
+            .from('blog_posts_tags')
+            .insert(tagRelations);
+          
+          if (tagError) throw tagError;
+        }
+        
+        return postData;
+      } catch (error: any) {
+        console.error('Error creating blog post:', error);
+        throw error;
+      } finally {
+        setLoading(false);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blog_posts'] });
+      toast({
+        title: 'Success',
+        description: 'Blog post created successfully',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to create blog post',
+        variant: 'destructive',
+      });
+    }
+  });
+
+  // Update blog post
+  const updatePost = useMutation({
+    mutationFn: async ({
+      id,
+      post,
+      categoryIds,
+      tagIds
+    }: {
+      id: string;
+      post: Partial<Omit<BlogPost, 'id' | 'created_at' | 'updated_at' | 'categories' | 'tags'>>;
+      categoryIds: string[];
+      tagIds: string[];
+    }) => {
+      setLoading(true);
+      try {
+        // Update published_at if post is being published
+        const updates: any = { ...post };
+        if (post.published === true) {
+          const { data: currentPost } = await supabase
+            .from('blog_posts')
+            .select('published, published_at')
+            .eq('id', id)
+            .single();
+          
+          if (!currentPost?.published_at) {
+            updates.published_at = new Date().toISOString();
+          }
+        }
+        
+        // 1. Update the blog post
+        const { data: postData, error: postError } = await supabase
+          .from('blog_posts')
+          .update(updates)
+          .eq('id', id)
+          .select()
+          .single();
+        
+        if (postError) throw postError;
+        
+        // 2. Delete existing category relationships
+        const { error: deleteCategories } = await supabase
+          .from('blog_posts_categories')
+          .delete()
+          .eq('post_id', id);
+        
+        if (deleteCategories) throw deleteCategories;
+        
+        // 3. Insert new category relationships
+        if (categoryIds.length > 0) {
+          const categoryRelations = categoryIds.map(categoryId => ({
+            post_id: id,
+            category_id: categoryId
+          }));
+          
+          const { error: categoryError } = await supabase
+            .from('blog_posts_categories')
+            .insert(categoryRelations);
+          
+          if (categoryError) throw categoryError;
+        }
+        
+        // 4. Delete existing tag relationships
+        const { error: deleteTags } = await supabase
+          .from('blog_posts_tags')
+          .delete()
+          .eq('post_id', id);
+        
+        if (deleteTags) throw deleteTags;
+        
+        // 5. Insert new tag relationships
+        if (tagIds.length > 0) {
+          const tagRelations = tagIds.map(tagId => ({
+            post_id: id,
+            tag_id: tagId
+          }));
+          
+          const { error: tagError } = await supabase
+            .from('blog_posts_tags')
+            .insert(tagRelations);
+          
+          if (tagError) throw tagError;
+        }
+        
+        return postData;
+      } catch (error: any) {
+        console.error('Error updating blog post:', error);
+        throw error;
+      } finally {
+        setLoading(false);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blog_posts'] });
+      toast({
+        title: 'Success',
+        description: 'Blog post updated successfully',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update blog post',
+        variant: 'destructive',
+      });
+    }
+  });
+
+  // Delete blog post
   const deletePost = useMutation({
     mutationFn: async (id: string) => {
-      // Delete category relations first
-      const { error: categoriesError } = await supabase
-        .from('blog_posts_categories')
-        .delete()
-        .eq('post_id', id);
-
-      if (categoriesError) {
-        console.error('Error deleting category relations:', categoriesError);
-        // Continue anyway
+      setLoading(true);
+      try {
+        // The foreign key constraints should cascade deletes
+        const { error } = await supabase
+          .from('blog_posts')
+          .delete()
+          .eq('id', id);
+        
+        if (error) throw error;
+        
+        return true;
+      } catch (error: any) {
+        console.error('Error deleting blog post:', error);
+        throw error;
+      } finally {
+        setLoading(false);
       }
-
-      // Delete tag relations
-      const { error: tagsError } = await supabase
-        .from('blog_posts_tags')
-        .delete()
-        .eq('post_id', id);
-
-      if (tagsError) {
-        console.error('Error deleting tag relations:', tagsError);
-        // Continue anyway
-      }
-
-      // Delete the post
-      const { error: postError } = await supabase
-        .from('blog_posts')
-        .delete()
-        .eq('id', id);
-
-      if (postError) {
-        console.error('Error deleting blog post:', postError);
-        throw postError;
-      }
-
-      return true;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-blogs'] });
-      queryClient.invalidateQueries({ queryKey: ['blogs'] });
+      queryClient.invalidateQueries({ queryKey: ['blog_posts'] });
+      toast({
+        title: 'Success',
+        description: 'Blog post deleted successfully',
+      });
     },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete blog post',
+        variant: 'destructive',
+      });
+    }
   });
 
-  // Create category mutation
+  // Create category
   const createCategory = useMutation({
-    mutationFn: async (category: { name: string; slug: string }) => {
-      const { data, error } = await supabase
-        .from('blog_categories')
-        .insert([category])
-        .select();
-
-      if (error) {
+    mutationFn: async (category: Omit<Category, 'id' | 'created_at'>) => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('blog_categories')
+          .insert({
+            name: category.name,
+            slug: category.slug
+          })
+          .select()
+          .single();
+        
+        if (error) throw error;
+        return data;
+      } catch (error: any) {
         console.error('Error creating category:', error);
         throw error;
+      } finally {
+        setLoading(false);
       }
-
-      return data?.[0];
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['blog-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['blog_categories'] });
+      toast({
+        title: 'Success',
+        description: 'Category created successfully',
+      });
     },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to create category',
+        variant: 'destructive',
+      });
+    }
   });
 
-  // Create tag mutation
+  // Create tag
   const createTag = useMutation({
-    mutationFn: async (tag: { name: string; slug: string }) => {
-      const { data, error } = await supabase
-        .from('blog_tags')
-        .insert([tag])
-        .select();
-
-      if (error) {
+    mutationFn: async (tag: Omit<Tag, 'id' | 'created_at'>) => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('blog_tags')
+          .insert({
+            name: tag.name,
+            slug: tag.slug
+          })
+          .select()
+          .single();
+        
+        if (error) throw error;
+        return data;
+      } catch (error: any) {
         console.error('Error creating tag:', error);
         throw error;
+      } finally {
+        setLoading(false);
       }
-
-      return data?.[0];
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['blog-tags'] });
+      queryClient.invalidateQueries({ queryKey: ['blog_tags'] });
+      toast({
+        title: 'Success',
+        description: 'Tag created successfully',
+      });
     },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to create tag',
+        variant: 'destructive',
+      });
+    }
   });
 
   return {
-    allPosts: allPostsData,
-    categories: categoriesData,
-    tags: tagsData,
-    isLoading,
-    error,
+    // Queries
+    posts,
+    allPosts,
+    categories,
+    tags,
+    isLoading: isLoadingPosts || isLoadingAllPosts || isLoadingCategories || isLoadingTags || loading,
+    
+    // Single post fetchers
+    fetchPostBySlug,
+    fetchPostById,
+    
+    // Mutations
     createPost,
     updatePost,
     deletePost,
     createCategory,
     createTag
   };
-};
-
-export const useBlogPost = (slug: string) => {
-  return useQuery({
-    queryKey: ['blogPost', slug],
-    queryFn: async () => {
-      const post = await fetchBlogPost(slug);
-      return formatBlogPost(post);
-    },
-    enabled: !!slug, // Ensure the query doesn't run without a slug
-  });
-};
-
-const formatBlogPost = (post: any) => {
-  if (!post) return null;
-
-  // Process categories
-  const categories = post.blog_posts_categories?.map((item: any) => {
-    if (item.blog_categories && typeof item.blog_categories === 'object') {
-      return {
-        id: item.blog_categories.id || null,
-        name: item.blog_categories.name || null,
-        slug: item.blog_categories.slug || null
-      };
-    }
-    return { id: null, name: null, slug: null };
-  }) || [];
-
-  // Process tags
-  const tags = post.blog_posts_tags?.map((item: any) => {
-    if (item.blog_tags && typeof item.blog_tags === 'object') {
-      return {
-        id: item.blog_tags.id || null,
-        name: item.blog_tags.name || null,
-        slug: item.blog_tags.slug || null
-      };
-    }
-    return { id: null, name: null, slug: null };
-  }) || [];
-
-  // Process author information
-  let authorName = 'Unknown Author';
-  if (post.profiles && typeof post.profiles === 'object') {
-    const firstName = post.profiles.first_name || '';
-    const lastName = post.profiles.last_name || '';
-    authorName = `${firstName} ${lastName}`.trim() || 'Unknown Author';
-  }
-
-  return {
-    ...post,
-    categories,
-    tags,
-    authorName
-  };
-};
-
-// Category and tag operations
-const getCategories = async () => {
-  try {
-    const { data, error } = await supabase
-      .from('blog_categories')
-      .select('*')
-      .order('name');
-
-    if (error) {
-      if (error.code === '42P01') { // Table doesn't exist
-        console.log('blog_categories table does not exist yet');
-        return [];
-      }
-      console.error('Error fetching categories:', error);
-      throw error;
-    }
-
-    return data || [];
-  } catch (error) {
-    console.error('Error in getCategories:', error);
-    return []; // Return empty array instead of throwing
-  }
-};
-
-const getTags = async () => {
-  try {
-    const { data, error } = await supabase
-      .from('blog_tags')
-      .select('*')
-      .order('name');
-
-    if (error) {
-      if (error.code === '42P01') { // Table doesn't exist
-        console.log('blog_tags table does not exist yet');
-        return [];
-      }
-      console.error('Error fetching tags:', error);
-      throw error;
-    }
-
-    return data || [];
-  } catch (error) {
-    console.error('Error in getTags:', error);
-    return []; // Return empty array instead of throwing
-  }
 };

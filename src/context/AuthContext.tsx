@@ -5,232 +5,227 @@ import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { Profile } from '@/types/data';
 
-interface AuthContextType {
-  user: User | null;
+type AuthContextType = {
   session: Session | null;
+  user: User | null;
+  profile: Profile | null;
   isAdmin: boolean;
-  isLoading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string) => Promise<{ error: any, data: any }>;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, metadata?: { first_name?: string; last_name?: string }) => Promise<void>;
   signOut: () => Promise<void>;
-  makeAdmin: (userId: string) => Promise<boolean>;
-}
+  updateProfile: (updates: Partial<Profile>) => Promise<void>;
+  refreshSession: () => Promise<void>;
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        checkAdminStatus(session.user.id);
-      } else {
-        setIsLoading(false);
+        fetchProfile(session.user.id);
+        checkAdminRole(session.user.id);
       }
+      setLoading(false);
     });
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          checkAdminStatus(session.user.id);
-        } else {
-          setIsAdmin(false);
-          setIsLoading(false);
-        }
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+        checkAdminRole(session.user.id);
+      } else {
+        setProfile(null);
+        setIsAdmin(false);
       }
-    );
+      setLoading(false);
+    });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
-  const checkAdminStatus = async (userId: string) => {
+  const fetchProfile = async (userId: string) => {
     try {
-      // First, check if user_roles table exists
-      const { error: tableCheckError } = await supabase
-        .from('user_roles')
-        .select('count(*)', { count: 'exact', head: true });
-      
-      if (tableCheckError && tableCheckError.code === '42P01') {
-        // Table doesn't exist, user can't be admin
-        setIsAdmin(false);
-        setIsLoading(false);
-        return;
-      }
-      
-      // Check if user is admin
       const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .eq('role', 'admin')
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
         .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "No rows returned" error
-        console.error('Error checking admin status:', error);
-        setIsAdmin(false);
-      } else {
-        setIsAdmin(!!data);
+      if (error) {
+        console.error('Error fetching profile:', error);
+        return;
       }
+
+      setProfile(data);
     } catch (error) {
-      console.error('Error in checkAdminStatus:', error);
-      setIsAdmin(false);
-    } finally {
-      setIsLoading(false);
+      console.error('Error fetching profile:', error);
     }
   };
 
-  const makeAdmin = async (userId: string): Promise<boolean> => {
+  const checkAdminRole = async (userId: string) => {
     try {
-      // First, check if user_roles table exists
-      const { error: tableCheckError } = await supabase
-        .from('user_roles')
-        .select('count(*)', { count: 'exact', head: true });
-      
-      if (tableCheckError && tableCheckError.code === '42P01') {
-        // Table doesn't exist, create it
-        const { error: createTableError } = await supabase.rpc('create_user_roles_table');
-        
-        if (createTableError) {
-          console.error('Error creating user_roles table:', createTableError);
-          toast({
-            title: 'Error',
-            description: 'Failed to create user roles table',
-            variant: 'destructive',
-          });
-          return false;
-        }
-      }
-      
-      // Check if the user already has an admin role
-      const { data: existingRole, error: checkError } = await supabase
+      const { data, error } = await supabase
         .from('user_roles')
         .select('*')
         .eq('user_id', userId)
         .eq('role', 'admin')
-        .single();
-      
-      if (checkError && checkError.code !== 'PGRST116') { // Not a "no rows" error
-        console.error('Error checking existing role:', checkError);
-        toast({
-          title: 'Error',
-          description: 'Failed to check existing role',
-          variant: 'destructive',
-        });
-        return false;
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking admin role:', error);
+        return;
       }
-      
-      // If the user is already an admin, no need to insert
-      if (existingRole) {
-        // If this is the current user, update the state
-        if (userId === user?.id) {
-          setIsAdmin(true);
-        }
-        return true;
-      }
-      
-      // Insert the admin role
-      const { error: insertError } = await supabase
-        .from('user_roles')
-        .insert([{ user_id: userId, role: 'admin' }]);
-      
-      if (insertError) {
-        console.error('Error making user admin:', insertError);
-        toast({
-          title: 'Error',
-          description: 'Failed to assign admin role',
-          variant: 'destructive',
-        });
-        return false;
-      }
-      
-      // If this is the current user, update the state
-      if (userId === user?.id) {
-        setIsAdmin(true);
-      }
-      
-      return true;
+
+      setIsAdmin(!!data);
     } catch (error) {
-      console.error('Error in makeAdmin:', error);
-      toast({
-        title: 'Error',
-        description: 'An unexpected error occurred',
-        variant: 'destructive',
-      });
-      return false;
+      console.error('Error checking admin role:', error);
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      navigate('/dashboard');
+    } catch (error: any) {
+      toast({
+        title: 'Sign in failed',
+        description: error.message,
+        variant: 'destructive',
       });
-      return { error };
-    } catch (error) {
-      console.error('Error signing in:', error);
-      return { error };
     }
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (
+    email: string, 
+    password: string, 
+    metadata?: { first_name?: string; last_name?: string }
+  ) => {
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: metadata,
+        },
       });
-      
-      if (!error && data.user) {
-        // Create a profile for the user
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([{ id: data.user.id, email: email }]);
-        
-        if (profileError) {
-          console.error('Error creating profile:', profileError);
-        }
-      }
-      
-      return { data, error };
-    } catch (error) {
-      console.error('Error signing up:', error);
-      return { data: null, error };
+      if (error) throw error;
+      toast({
+        title: 'Sign up successful',
+        description: 'Please check your email for confirmation.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Sign up failed',
+        description: error.message,
+        variant: 'destructive',
+      });
     }
   };
 
   const signOut = async () => {
     try {
-      await supabase.auth.signOut();
+      setLoading(true);
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error("Sign out error:", error);
+        toast({
+          title: "Error signing out",
+          description: error.message,
+          variant: "destructive"
+        });
+        return false;
+      }
+      
+      // Force clear session and user state
+      setSession(null);
+      setUser(null);
+      setProfile(null);
       setIsAdmin(false);
+      
+      // Successfully signed out
+      toast({
+        title: "Signed out",
+        description: "You have been successfully signed out."
+      });
+      return true;
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error("Unexpected error during sign out:", error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateProfile = async (updates: Partial<Profile>) => {
+    try {
+      if (!user) throw new Error('No user logged in');
+
+      // Use type assertion to bypass TypeScript checks completely
+      const { error } = await (supabase.from('profiles') as any)
+        .update(updates)
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setProfile({
+        ...profile,
+        ...updates,
+      } as Profile);
+
+      toast({
+        title: 'Profile updated',
+        description: 'Your profile has been updated successfully.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error updating profile',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const refreshSession = async () => {
+    try {
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error) throw error;
+      setSession(data.session);
+      setUser(data.session?.user ?? null);
+    } catch (error: any) {
+      console.error('Error refreshing session:', error.message);
     }
   };
 
   return (
     <AuthContext.Provider
       value={{
-        user,
         session,
+        user,
+        profile,
         isAdmin,
-        isLoading,
+        loading,
         signIn,
         signUp,
         signOut,
-        makeAdmin,
+        updateProfile,
+        refreshSession,
       }}
     >
       {children}
@@ -238,7 +233,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-export const useAuth = (): AuthContextType => {
+export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
